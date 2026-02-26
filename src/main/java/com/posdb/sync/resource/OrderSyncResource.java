@@ -1,10 +1,10 @@
 package com.posdb.sync.resource;
 
-import com.posdb.sync.dto.OrderHeaderSyncRequest;
-import com.posdb.sync.dto.OrderHeaderData;
-import com.posdb.sync.dto.OrderPaymentSyncRequest;
-import com.posdb.sync.dto.OrderPaymentData;
-import com.posdb.sync.dto.SyncResponse;
+import com.posdb.sync.dto.request.OrderHeaderSyncRequest;
+import com.posdb.sync.dto.table.OrderHeaderData;
+import com.posdb.sync.dto.request.OrderPaymentSyncRequest;
+import com.posdb.sync.dto.table.OrderPaymentData;
+import com.posdb.sync.dto.response.SyncResponse;
 import com.posdb.sync.entity.OrderHeader;
 import com.posdb.sync.entity.OrderPayment;
 import com.posdb.sync.service.ApiKeyValidator;

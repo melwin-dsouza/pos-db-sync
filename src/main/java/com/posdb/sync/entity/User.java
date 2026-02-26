@@ -1,46 +1,69 @@
 package com.posdb.sync.entity;
 
+import com.posdb.sync.entity.enums.UserRole;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
-import java.time.OffsetDateTime;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+import java.util.Date;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"restaurant_id", "email"})
-})
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(exclude = "passwordHash")
 public class User extends PanacheEntityBase {
 
     @Id
-    @Column(columnDefinition = "UUID")
-    public UUID id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Column(name = "restaurant_id", nullable = false, columnDefinition = "UUID")
-    public UUID restaurantId;
-
-    @Column(nullable = false, length = 255)
-    public String email;
+    @ManyToOne
+    @JoinColumn(name = "restaurant_id", referencedColumnName = "id")
+    private Restaurant restaurant;
 
     @Column(nullable = false, length = 255)
-    public String passwordHash;
+    private String email;
 
-    @Column(nullable = false, length = 20)
-    public String role;
+    @Column
+    private String mobileNumber;
+
+    @Column
+    private String fullName;
+
+    @Column(nullable = false, length = 255)
+    private String passwordHash;
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
 
     @Column(nullable = false)
-    public Boolean mustChangePassword;
+    private Boolean mustChangePassword;
 
-    @Column(nullable = false)
-    public OffsetDateTime createdAt;
+    @Column
+    private Date createdAt;
 
-    @Column(nullable = false)
-    public OffsetDateTime updatedAt;
+    @Column
+    private Date updatedAt;
 
-    public User() {
-        this.createdAt = OffsetDateTime.now();
-        this.updatedAt = OffsetDateTime.now();
+
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
         this.mustChangePassword = true;
-        this.role = "MANAGER";
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = new Date();
     }
 }
 

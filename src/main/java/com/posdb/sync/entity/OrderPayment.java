@@ -2,58 +2,76 @@ package com.posdb.sync.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import java.util.Date;
 
 @Entity
 @Table(name = "order_payments", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"restaurant_id", "order_payment_id"})
 })
+@Getter
+@Setter
+@NoArgsConstructor
 public class OrderPayment extends PanacheEntityBase {
 
     @Id
-    @Column(columnDefinition = "UUID")
-    public UUID id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
 
-    @Column(name = "restaurant_id", nullable = false, columnDefinition = "UUID")
-    public UUID restaurantId;
-
-    @Column(nullable = false)
-    public Integer orderPaymentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "restaurant_id", nullable = false)
+    private Restaurant restaurant;
 
     @Column(nullable = false)
-    public OffsetDateTime paymentDateTime;
+    private Integer orderPaymentId;
+
+    @Column(nullable = false)
+    private Integer orderId;
+
+    @Column(nullable = false)
+    private Date paymentDateTime;
 
     @Column
-    public Integer cashierId;
+    private Integer cashierId;
 
     @Column
-    public Integer nonCashierEmployeeId;
-
-    @Column(nullable = false)
-    public Integer orderId;
+    private Integer nonCashierEmployeeId;
 
     @Column(length = 50)
-    public String paymentMethod;
+    private String paymentMethod;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal amountTendered;
+    private BigDecimal amountTendered;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal amountPaid;
+    private BigDecimal amountPaid;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal employeeComp;
+    private BigDecimal employeeComp;
 
     @Column(length = 36)
-    public String rowGuid;
+    private String rowGuid;
 
-    @Column(nullable = false)
-    public OffsetDateTime createdAt;
+    @Column
+    private Date createdAt;
 
-    public OrderPayment() {
-        this.createdAt = OffsetDateTime.now();
+    @Column
+    private Date updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = new Date();
+        updatedAt = new Date();
     }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = new Date();
+    }
+
 }
 

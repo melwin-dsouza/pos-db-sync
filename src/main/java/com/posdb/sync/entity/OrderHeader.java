@@ -1,77 +1,98 @@
 package com.posdb.sync.entity;
 
+import com.posdb.sync.entity.enums.OrderTypeEnum;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import java.util.Date;
 
 @Entity
-@Table(name = "order_headers", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"restaurant_id", "order_id"})
-})
+@Table(name = "order_headers")
+@Getter
+@Setter
+@NoArgsConstructor
 public class OrderHeader extends PanacheEntityBase {
 
     @Id
-    @Column(columnDefinition = "UUID")
-    public UUID id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
 
-    @Column(name = "restaurant_id", nullable = false, columnDefinition = "UUID")
-    public UUID restaurantId;
-
-    @Column(nullable = false)
-    public Integer orderId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "restaurant_id", nullable = false)
+    private Restaurant restaurant;
 
     @Column(nullable = false)
-    public OffsetDateTime orderDateTime;
+    private Integer orderId;
+
+    @Column(nullable = false)
+    private Date orderDateTime;
 
     @Column
-    public Integer employeeId;
+    private Integer employeeId;
 
     @Column
-    public Integer stationId;
+    private Integer stationId;
 
     @Column(length = 50)
-    public String orderType;
+    private String orderTypeId;
+    
+    @Column
+    @Enumerated(EnumType.STRING)
+    private OrderTypeEnum orderType;
+    
+    @Column
+    private Integer dineInTableId;
 
     @Column
-    public Integer dineInTableId;
+    private Integer driverEmployeeId;
 
     @Column
-    public Integer driverEmployeeId;
-
-    @Column
-    public Integer discountId;
+    private Integer discountId;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal discountAmount;
+    private BigDecimal discountAmount;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal amountDue;
+    private BigDecimal amountDue;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal cashDiscountAmount;
+    private BigDecimal cashDiscountAmount;
 
     @Column
-    public Integer cashDiscountApprovalEmpId;
+    private Integer cashDiscountApprovalEmpId;
 
     @Column(precision = 12, scale = 2)
-    public BigDecimal subTotal;
+    private BigDecimal subTotal;
 
     @Column
-    public Integer guestNumber;
+    private Integer guestNumber;
 
     @Column
-    public OffsetDateTime editTimestamp;
+    private Date editTimestamp;
 
     @Column(length = 36)
-    public String rowGuid;
+    private String rowGuid;
 
-    @Column(nullable = false)
-    public OffsetDateTime createdAt;
+    @Column
+    private Date createdAt;
+    
+    @Column
+    private Date updatedAt;
 
-    public OrderHeader() {
-        this.createdAt = OffsetDateTime.now();
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = new Date();
+        updatedAt = new Date();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = new Date();
     }
 }
 

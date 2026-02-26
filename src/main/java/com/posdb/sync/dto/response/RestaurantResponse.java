@@ -1,4 +1,4 @@
-package com.posdb.sync.dto;
+package com.posdb.sync.dto.response;
 
 import java.util.UUID;
 

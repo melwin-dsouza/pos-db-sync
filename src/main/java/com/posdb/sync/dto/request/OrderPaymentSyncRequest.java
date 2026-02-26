@@ -1,4 +1,6 @@
-package com.posdb.sync.dto;
+package com.posdb.sync.dto.request;
+
+import com.posdb.sync.dto.table.OrderPaymentData;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.posdb.sync.service;
+package com.posdb.sync.utils;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.slf4j.Logger;

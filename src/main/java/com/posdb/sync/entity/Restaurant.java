@@ -2,31 +2,57 @@ package com.posdb.sync.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
-import java.time.OffsetDateTime;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
 @Table(name = "restaurant")
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(exclude = {"apiKey", "userList"})
 public class Restaurant extends PanacheEntityBase {
 
     @Id
-    @Column(columnDefinition = "UUID")
-    public UUID id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false, length = 255)
-    public String name;
+    private String name;
+
+    @Column
+    private String keyword;
+    
+    @Column
+    private String description;
+    
+    @Column
+    private String address;
+    
+    @Column
+    private String phoneNumber;
 
     @Column(nullable = false, unique = true, length = 32)
-    public String apiKey;
+    private String apiKey;
 
-    @Column(nullable = false)
-    public OffsetDateTime createdAt;
+    @Column
+    private Date createdAt;
 
     @Column(nullable = false, length = 20)
-    public String status;
+    private String status;
 
-    public Restaurant() {
-        this.createdAt = OffsetDateTime.now();
+    @OneToMany(mappedBy = "restaurant")
+    private List<User> userList;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = new Date();
         this.status = "ACTIVE";
     }
 }
