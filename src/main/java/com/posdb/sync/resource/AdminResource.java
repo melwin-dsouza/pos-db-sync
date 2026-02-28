@@ -3,6 +3,7 @@ package com.posdb.sync.resource;
 import com.posdb.sync.dto.request.CreateUserRequest;
 import com.posdb.sync.dto.request.CreateRestaurantRequest;
 import com.posdb.sync.dto.response.ApiResponse;
+import com.posdb.sync.dto.response.CreateRestaurantResponse;
 import com.posdb.sync.service.AdminService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -19,13 +20,16 @@ public class AdminResource {
     @Inject
     AdminService adminService;
 
+    // For creating new restaurant, For internal use only, not exposed to mobile app.
+    // Used by admin panel to create new restaurant and its first user (owner)
+
     @POST
     @Path("/restaurant")
     public Response createRestaurant(CreateRestaurantRequest request) {
         log.info("AdminResource:: Creating new restaurant with name: {}", request);
-        adminService.createRestaurant(request);
+        CreateRestaurantResponse restaurant = adminService.createRestaurant(request);
         return Response.status(Response.Status.CREATED)
-                .entity(new ApiResponse<>(201, "Success"))
+                .entity(new ApiResponse<>(201, restaurant, null))
                 .build();
     }
 
@@ -35,8 +39,10 @@ public class AdminResource {
         log.info("AdminResource:: Creating new user for restaurantId: {}, request:{}", restaurantId, request);
         adminService.createUser(restaurantId, request);
         return Response.status(Response.Status.CREATED)
-                .entity(new ApiResponse<>(201, "Success"))
+                .entity(new ApiResponse<>(201, "Success", null))
                 .build();
     }
+
+    //adding restaurant under existing owner not available right now, will be done through query.
 }
 

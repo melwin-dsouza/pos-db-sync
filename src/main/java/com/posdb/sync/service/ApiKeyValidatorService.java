@@ -3,18 +3,16 @@ package com.posdb.sync.service;
 import com.posdb.sync.entity.Restaurant;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.NoResultException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.UUID;
 
 @ApplicationScoped
-public class ApiKeyValidator {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ApiKeyValidator.class);
+@Slf4j
+public class ApiKeyValidatorService {
 
-    public UUID validateAndGetRestaurantId(String apiKey) {
+    public Restaurant validateAndGetRestaurantId(String apiKey) {
         if (apiKey == null || apiKey.isEmpty()) {
-            LOGGER.warn("API key is missing");
+            log.warn("API key is missing");
             throw new IllegalArgumentException("API key is required");
         }
 
@@ -22,19 +20,19 @@ public class ApiKeyValidator {
             Restaurant restaurant = Restaurant.<Restaurant>find("apiKey", apiKey).firstResult();
 
             if (restaurant == null) {
-                LOGGER.warn("Invalid API key provided");
+                log.warn("Invalid API key provided");
                 throw new IllegalArgumentException("Invalid API key");
             }
 
-            if (!"ACTIVE".equals(restaurant.status)) {
-                LOGGER.warn("API key for inactive restaurant: {}", restaurant.id);
+            if (!"ACTIVE".equals(restaurant.getStatus())) {
+                log.warn("API key for inactive restaurant: {}, {}", restaurant.getId(), restaurant.getName());
                 throw new IllegalArgumentException("Restaurant is not active");
             }
 
-            LOGGER.info("API key validated successfully for restaurantId: {}", restaurant.id);
-            return restaurant.id;
+            log.info("API key validated successfully for restaurantId: {}, {}", restaurant.getId(), restaurant.getName());
+            return restaurant;
         } catch (NoResultException e) {
-            LOGGER.warn("API key validation failed - key not found");
+            log.warn("API key validation failed - key not found");
             throw new IllegalArgumentException("Invalid API key", e);
         }
     }

@@ -8,7 +8,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -16,7 +18,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = "passwordHash")
+@ToString(exclude = {"passwordHash", "restaurants"})
 public class User extends PanacheEntityBase {
 
     @Id
@@ -25,31 +27,39 @@ public class User extends PanacheEntityBase {
 
     @ManyToOne
     @JoinColumn(name = "restaurant_id", referencedColumnName = "id")
-    private Restaurant restaurant;
+    private Restaurant primaryRestaurant;
 
-    @Column(nullable = false, length = 255)
+    @ManyToMany
+    @JoinTable(
+            name = "user_restaurants",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "restaurant_id")
+    )
+    private List<Restaurant> restaurants = new ArrayList<>();
+
+    @Column(name = "email", nullable = false, length = 255)
     private String email;
 
-    @Column
+    @Column(name = "mobile_number")
     private String mobileNumber;
 
-    @Column
+    @Column(name = "full_name")
     private String fullName;
 
-    @Column(nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column
+    @Column(name = "role")
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    @Column(nullable = false)
+    @Column(name = "must_change_password", nullable = false)
     private Boolean mustChangePassword;
 
-    @Column
+    @Column(name = "created_at")
     private Date createdAt;
 
-    @Column
+    @Column(name = "updated_at")
     private Date updatedAt;
 
 

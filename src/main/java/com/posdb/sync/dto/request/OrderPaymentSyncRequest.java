@@ -1,18 +1,18 @@
 package com.posdb.sync.dto.request;
 
 import com.posdb.sync.dto.table.OrderPaymentData;
+import lombok.*;
 
 import java.util.List;
 
+@Getter
+@Setter
+@ToString
+@AllArgsConstructor
+@NoArgsConstructor
 public class OrderPaymentSyncRequest {
-    public List<OrderPaymentData> orderPayments;
+    private List<OrderPaymentData> orderPayments;
 
-    public OrderPaymentSyncRequest() {
-    }
-
-    public OrderPaymentSyncRequest(List<OrderPaymentData> orderPayments) {
-        this.orderPayments = orderPayments;
-    }
 }
 
 

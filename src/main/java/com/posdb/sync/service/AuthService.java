@@ -1,7 +1,6 @@
 package com.posdb.sync.service;
 
 import com.posdb.sync.dto.request.LoginRequest;
-import com.posdb.sync.dto.response.LoginResponse;
 import com.posdb.sync.entity.User;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.utils.PasswordUtil;

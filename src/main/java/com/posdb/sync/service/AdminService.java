@@ -2,7 +2,7 @@ package com.posdb.sync.service;
 
 import com.posdb.sync.dto.request.CreateUserRequest;
 import com.posdb.sync.dto.request.CreateRestaurantRequest;
-import com.posdb.sync.dto.response.OwnerResponse;
+import com.posdb.sync.dto.response.CreateRestaurantResponse;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
 import com.posdb.sync.entity.enums.UserRole;
@@ -27,7 +27,7 @@ public class AdminService {
     PasswordUtil passwordUtil;
 
     @Transactional
-    public void createRestaurant(CreateRestaurantRequest request) {
+    public CreateRestaurantResponse createRestaurant(CreateRestaurantRequest request) {
         try {
             log.info("AdminService:: Creating new restaurant: {}", request.getName());
             if (request.getName() == null || request.getName().trim().isEmpty()) {
@@ -36,17 +36,12 @@ public class AdminService {
             }
             String apiKey = keyGenerator.generateApiKey();
 
-            Restaurant restaurant = new Restaurant();
-            restaurant.setName(request.getName());
-            restaurant.setApiKey(apiKey);
-            restaurant.setStatus("ACTIVE");
-            restaurant.setKeyword(request.getKeyword());
-            restaurant.setDescription(request.getDescription());
-            restaurant.setAddress(request.getAddress());
-            restaurant.setPhoneNumber(request.getPhone());
+            Restaurant restaurant = createRestaurant(request, apiKey);
             restaurant.persist();
-
+            restaurant = Restaurant.<Restaurant>find("apiKey = ?1", apiKey)
+                    .firstResultOptional().orElse(null);
             log.info("AdminService::Restaurant created successfully: {} with ID: {}", request.getName(), restaurant.getId());
+            return new CreateRestaurantResponse(restaurant.getId().toString(), restaurant.getName(), restaurant.getApiKey());
         } catch (Exception e) {
             log.error("AdminService:: Error creating restaurant. ", e);
             throw new AppException("Failed to create restaurant", Response.Status.INTERNAL_SERVER_ERROR);
@@ -86,7 +81,8 @@ public class AdminService {
             String passwordHash = passwordUtil.hashPassword(generatedPassword);
 
             User user = new User();
-            user.setRestaurant(restaurant);
+            user.getRestaurants().add(restaurant);
+            user.setPrimaryRestaurant(restaurant);
             user.setEmail(request.getEmail());
             user.setMobileNumber(request.getMobileNumber());
             user.setFullName(request.getFullName());
@@ -104,4 +100,19 @@ public class AdminService {
             throw new AppException("Failed to create owner", Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
+
+    private Restaurant createRestaurant(CreateRestaurantRequest request, String apiKey) {
+        Restaurant restaurant = new Restaurant();
+        restaurant.setName(request.getName());
+        restaurant.setApiKey(apiKey);
+        restaurant.setStatus("ACTIVE");
+        restaurant.setKeyword(request.getKeyword());
+        restaurant.setDescription(request.getDescription());
+        restaurant.setAddress(request.getAddress());
+        restaurant.setPhoneNumber(request.getPhone());
+        restaurant.setClosingTime(request.getClosingTime());
+        restaurant.setOpeningTime(request.getOpeningTime());
+        return restaurant;
+    }
+
 }

@@ -19,68 +19,81 @@ public class OrderHeader extends PanacheEntityBase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
 
-    @Column(nullable = false)
+    @Column(name = "order_id", nullable = false)
     private Integer orderId;
 
-    @Column(nullable = false)
+    @Column(name = "order_date_time", nullable = false)
     private Date orderDateTime;
 
-    @Column
+    @Column(name = "employee_id")
     private Integer employeeId;
 
-    @Column
+    @Column(name = "station_id")
     private Integer stationId;
 
-    @Column(length = 50)
+    @Column(name = "order_type_id")
     private String orderTypeId;
-    
-    @Column
+
+    @Column(name = "order_type")
     @Enumerated(EnumType.STRING)
     private OrderTypeEnum orderType;
-    
-    @Column
+
+    @Column(name = "dine_in_table_id")
     private Integer dineInTableId;
 
-    @Column
+    @Column(name = "customer_id")
+    private Integer customerId;
+
+    @Column(name = "delivery_charge")
+    private BigDecimal deliveryCharge;
+
+    @Column(name = "driver_employee_id")
     private Integer driverEmployeeId;
 
-    @Column
+    @Column(name = "discount_id")
     private Integer discountId;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "discount_amount")
     private BigDecimal discountAmount;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "amount_due")
     private BigDecimal amountDue;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "cash_discount_amount")
     private BigDecimal cashDiscountAmount;
 
-    @Column
+    @Column(name = "cash_discount_approval_emp_id")
     private Integer cashDiscountApprovalEmpId;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "sub_total")
     private BigDecimal subTotal;
 
-    @Column
+    @Column(name = "vat_rate")
+    private Double vatRate;
+
+    @Column(name = "vat_amount")
+    private BigDecimal vatAmount;
+
+    @Column(name = "guest_number")
     private Integer guestNumber;
 
-    @Column
+    @Column(name = "edit_timestamp")
     private Date editTimestamp;
 
-    @Column(length = 36)
+    @Column(name = "row_guid")
     private String rowGuid;
 
-    @Column
+    @Column(name = "created_at")
     private Date createdAt;
-    
-    @Column
+
+    @Column(name = "updated_at")
     private Date updatedAt;
 
 

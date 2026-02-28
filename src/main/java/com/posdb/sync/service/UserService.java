@@ -1,6 +1,9 @@
 package com.posdb.sync.service;
 
 import com.posdb.sync.dto.request.ChangePasswordRequest;
+import com.posdb.sync.dto.response.RestaurantInfo;
+import com.posdb.sync.dto.response.UserInfoResponse;
+import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.utils.PasswordUtil;
@@ -12,6 +15,8 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+
+import java.util.List;
 
 @ApplicationScoped
 @Slf4j
@@ -59,5 +64,33 @@ public class UserService {
             log.error("Error changing password", e);
             throw new AppException("Error changing password", Response.Status.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public UserInfoResponse getUserInfo() {
+        String userEmail = securityIdentity.getPrincipal().getName();
+        User user = User.<User>find("email = ?1", userEmail)
+                .firstResultOptional().orElse(null);
+        if (user == null ) {
+            log.warn("User not found for Get User Info request : {}", userEmail);
+            throw new AppException("User not found", Response.Status.BAD_REQUEST);
+        }
+        RestaurantInfo primaryRestaurantInfo = null;
+        if (user.getPrimaryRestaurant() != null) {
+            Restaurant restaurant = user.getPrimaryRestaurant();
+            primaryRestaurantInfo = new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress());
+        }
+        List<RestaurantInfo> restaurantInfos = user.getRestaurants().stream()
+                .map(r -> new RestaurantInfo(r.getId().toString(), r.getName(), r.getAddress()))
+                .toList();
+        UserInfoResponse userInfoResponse = new UserInfoResponse(
+                user.getFullName(),
+                user.getEmail(),
+                user.getMobileNumber(),
+                primaryRestaurantInfo,
+                restaurantInfos
+        );
+        log.info("Fetched User info successfully for userId: {}", userEmail);
+        return userInfoResponse;
+
     }
 }

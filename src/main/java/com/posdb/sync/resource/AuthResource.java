@@ -22,12 +22,12 @@ public class AuthResource {
     AuthService authService;
 
     @POST
-    @Path("/login")
+    @Path("/login") // No authentication required for login, For mobile user to login and get token
     public Response login(LoginRequest request) {
         log.info("AuthResource:: Received Login request: {}", request);
         String token = authService.login(request);
         return Response.status(Response.Status.CREATED)
-                .entity(new ApiResponse<>(201, token))
+                .entity(new ApiResponse<>(201, token, null))
                 .build();
     }
 }

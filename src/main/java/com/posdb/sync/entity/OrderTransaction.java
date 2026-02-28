@@ -10,47 +10,49 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Entity
-@Table(name = "order_payments")
+@Table(name = "order_transactions")
 @Getter
 @Setter
 @NoArgsConstructor
-public class OrderPayment extends PanacheEntityBase {
+public class OrderTransaction extends PanacheEntityBase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
 
-    @Column(name = "order_payment_id", nullable = false)
-    private Integer orderPaymentId;
+    @Column(name = "order_transaction_id", nullable = false)
+    private Integer orderTransactionId;
 
     @Column(name = "order_id", nullable = false)
     private Integer orderId;
 
-    @Column(name = "payment_date_time")
-    private Date paymentDateTime;
+    @Column(name = "menu_item_id")
+    private Integer menuItemId;
 
-    @Column(name = "cashier_id")
-    private Integer cashierId;
+    @Column(name = "menu_item_unit_price")
+    private BigDecimal menuItemUnitPrice;
 
-    @Column(name = "non_cashier_employee_id")
-    private Integer nonCashierEmployeeId;
+    @Column(name = "quantity")
+    private BigDecimal quantity;
 
-    @Column(name = "payment_method")
-    private String paymentMethod;
+    @Column(name = "extended_price")
+    private BigDecimal extendedPrice;
 
-    @Column(name = "amount_tendered")
-    private BigDecimal amountTendered;
+    @Column(name = "discount_id")
+    private Integer discountId;
 
-    @Column(name = "amount_paid")
-    private BigDecimal amountPaid;
+    @Column(name = "discount_amount")
+    private BigDecimal discountAmount;
 
-    @Column(name = "employee_comp")
-    private BigDecimal employeeComp;
+    @Column(name = "discount_basis")
+    private String discountBasis;
+
+    @Column(name = "discount_amount_used")
+    private BigDecimal discountAmountUsed;
 
     @Column(name = "row_guid")
     private String rowGuid;
@@ -71,6 +73,5 @@ public class OrderPayment extends PanacheEntityBase {
     public void preUpdate() {
         updatedAt = new Date();
     }
-
 }
 

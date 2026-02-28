@@ -2,6 +2,8 @@ package com.posdb.sync.dto.request;
 
 import lombok.*;
 
+import java.time.LocalTime;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -13,5 +15,7 @@ public class CreateRestaurantRequest {
     private String address;
     private String phone;
     private String keyword;
+    private LocalTime openingTime;
+    private LocalTime closingTime;
 }
 

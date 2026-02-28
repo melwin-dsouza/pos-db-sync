@@ -1,0 +1,613 @@
+{
+  "info": {
+    "name": "POS DB Sync API",
+    "description": "# POS DB Sync API Collection\n\nThis collection covers all REST APIs for the **POS DB Sync** backend service built with Quarkus.\n\n## Base URL\n`http://localhost:8080`\n\n## Authentication\n- **Admin APIs** (`/api/v1/admin/*`) — HTTP Basic Auth (`admin` / `<password>`)\n- **POS Sync APIs** (`/api/v1/pos/*`) — API Key via header `X-API-KEY`\n- **Auth API** (`/api/v1/auth/login`) — Public, no auth required\n- **User / Dashboard APIs** — JWT Bearer Token (obtained from `/auth/login`)\n\n## Standard Response Envelope\n```json\n{\n  \"status\": 200,\n  \"data\": { ... },\n  \"errorMessage\": null\n}\n```\n\n## Variables\n| Variable | Description |\n|---|---|\n| `baseUrl` | Base URL of the server (default: `http://localhost:8080`) |\n| `jwtToken` | JWT token obtained after login |\n| `restaurantId` | UUID of the target restaurant |\n| `apiKey` | API key for POS device sync |\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "jwtToken", "value": "", "type": "string" },
+    { "key": "restaurantId", "value": "", "type": "string" },
+    { "key": "apiKey", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Admin",
+      "description": "Internal admin APIs for managing restaurants and users. Protected by HTTP Basic Authentication.\n\n> **Auth:** Basic Auth — Username: `admin`, Password: configured in `application.properties`",
+      "item": [
+        {
+          "name": "Create Restaurant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "admin", "type": "string" },
+                { "key": "password", "value": "admin", "type": "string" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/restaurant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "restaurant"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sunset Diner\",\n  \"description\": \"A cozy diner with sunset views\",\n  \"address\": \"123 Ocean Drive, Miami, FL 33139\",\n  \"phone\": \"+13051234567\",\n  \"keyword\": \"sunset-diner\",\n  \"openingTime\": \"08:00\",\n  \"closingTime\": \"22:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new restaurant in the system. This is an **internal admin-only** endpoint used by the admin panel to onboard a new restaurant.\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `name` | string | ✅ | Restaurant name |\n| `description` | string | ❌ | Short description |\n| `address` | string | ❌ | Physical address |\n| `phone` | string | ❌ | Contact phone number |\n| `keyword` | string | ❌ | Unique URL-friendly identifier |\n| `openingTime` | string (HH:mm) | ❌ | Business opening time |\n| `closingTime` | string (HH:mm) | ❌ | Business closing time |\n\n### Auth\nHTTP Basic Auth — `admin` / `<configured password>`\n\n### Response\nReturns the new restaurant's ID, name, and generated API key."
+          },
+          "response": [
+            {
+              "name": "201 Created — Success",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 201,\n  \"data\": {\n    \"restaurantId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"restaurantName\": \"Sunset Diner\",\n    \"apiKey\": \"sk_live_AbCdEfGhIjKlMnOpQrStUvWxYz123456\"\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurant" },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Sunset Diner\",\n  \"description\": \"A cozy diner\",\n  \"address\": \"123 Ocean Drive\",\n  \"phone\": \"+13051234567\",\n  \"keyword\": \"sunset-diner\",\n  \"openingTime\": \"08:00\",\n  \"closingTime\": \"22:00\"\n}"
+                }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Missing / Wrong Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Unauthorized\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurant" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Missing Required Field",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Restaurant name is required\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurant" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create User for Restaurant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "admin", "type": "string" },
+                { "key": "password", "value": "admin", "type": "string" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/restaurants/{{restaurantId}}/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "restaurants", "{{restaurantId}}", "user"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@sunsetdiner.com\",\n  \"fullName\": \"John Smith\",\n  \"mobileNumber\": \"+13051234567\",\n  \"role\": \"OWNER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new user and assigns them to the specified restaurant. The user will be required to change their password on first login (`mustChangePassword = true`).\n\n### Path Parameters\n| Parameter | Type | Description |\n|---|---|---|\n| `restaurantId` | UUID | The target restaurant's UUID |\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `email` | string | ✅ | User's email address (used for login) |\n| `fullName` | string | ❌ | Full name of the user |\n| `mobileNumber` | string | ❌ | Mobile/phone number |\n| `role` | string | ✅ | Role: `OWNER`, `MANAGER`, or `STAFF` |\n\n### Auth\nHTTP Basic Auth — `admin` / `<configured password>`\n\n### Notes\n- A temporary password is auto-generated and must be changed on first login.\n- The email is used as the login identifier."
+          },
+          "response": [
+            {
+              "name": "201 Created — Success",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 201,\n  \"data\": \"Success\",\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurants/{{restaurantId}}/user" }
+              }
+            },
+            {
+              "name": "404 Not Found — Restaurant Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 404,\n  \"data\": null,\n  \"errorMessage\": \"Restaurant not found with id: a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurants/{{restaurantId}}/user" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Email Already Exists",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"User with email already exists\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/admin/restaurants/{{restaurantId}}/user" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication APIs. Public — no authentication required.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.data) {",
+                  "    pm.collectionVariables.set('jwtToken', jsonData.data);",
+                  "    console.log('JWT Token saved to collection variable: jwtToken');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@sunsetdiner.com\",\n  \"password\": \"YourPassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Authenticates a user (restaurant owner / manager / staff) and returns a signed JWT token.\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `email` | string | ✅ | Registered email address |\n| `password` | string | ✅ | Account password |\n\n### Auth\nPublic — No authentication required.\n\n### Response\nThe `data` field contains the raw JWT token string. Include it in subsequent requests as:\n```\nAuthorization: Bearer <token>\n```\n\n### Notes\n- Token expiry: **1 hour**\n- After successful login, this request's test script automatically saves the token to the `jwtToken` collection variable."
+          },
+          "response": [
+            {
+              "name": "201 — Success",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 201,\n  \"data\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lckBzdW5zZXRkaW5lci5jb20iLCJpc3MiOiJwb3MtZGItc3luYyIsImF1ZCI6InBvcy1tb2JpbGUtYXBwIiwicm9sZXMiOlsiT1dORVIiXSwiaWF0IjoxNzA5MTIzNDU2LCJleHAiOjE3MDkxMjcwNTZ9.signature\",\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/login" },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"owner@sunsetdiner.com\",\n  \"password\": \"YourPassword123\"\n}"
+                }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Wrong Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Invalid email or password\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/login" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Missing Fields",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Email and password are required\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/login" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "User profile and account management APIs. Require a valid JWT Bearer token.\n\n> **Auth:** Bearer Token — Set `jwtToken` collection variable after login.",
+      "item": [
+        {
+          "name": "Get User Info",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/user-info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "user-info"]
+            },
+            "description": "Returns the authenticated user's profile information including their primary restaurant and all associated restaurants.\n\n### Auth\nJWT Bearer Token — Roles: `OWNER`, `MANAGER`, `STAFF`\n\n### Response Fields\n| Field | Type | Description |\n|---|---|---|\n| `fullName` | string | User's full name |\n| `email` | string | User's email |\n| `phoneNumber` | string | User's phone number |\n| `primaryRestaurant` | object | Primary assigned restaurant |\n| `associatedRestaurants` | array | All restaurants the user has access to |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"fullName\": \"John Smith\",\n    \"email\": \"owner@sunsetdiner.com\",\n    \"phoneNumber\": \"+13051234567\",\n    \"primaryRestaurant\": {\n      \"restaurantId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"restaurantName\": \"Sunset Diner\",\n      \"restaurantAddress\": \"123 Ocean Drive, Miami, FL 33139\"\n    },\n    \"associatedRestaurants\": [\n      {\n        \"restaurantId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n        \"restaurantName\": \"Sunset Diner\",\n        \"restaurantAddress\": \"123 Ocean Drive, Miami, FL 33139\"\n      }\n    ]\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/user/user-info" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Missing / Expired Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Unauthorized\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/user/user-info" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "change-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldPassword123\",\n  \"newPassword\": \"NewSecurePassword456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Allows an authenticated user to change their account password.\n\n### Auth\nJWT Bearer Token — Roles: `OWNER`, `MANAGER`, `STAFF`\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `currentPassword` | string | ✅ | The user's existing password |\n| `newPassword` | string | ✅ | The new password to set |\n\n### Notes\n- This endpoint should be called immediately after first login when `mustChangePassword` is `true`.\n- Clears the `mustChangePassword` flag after a successful change."
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": \"Success\",\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/user/change-password" },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"OldPassword123\",\n  \"newPassword\": \"NewSecurePassword456\"\n}"
+                }
+              }
+            },
+            {
+              "name": "400 Bad Request — Wrong Current Password",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Current password is incorrect\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/user/change-password" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Missing / Expired Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Unauthorized\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/user/change-password" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard and analytics APIs for restaurant owners and managers. Require a valid JWT Bearer token.\n\n> **Auth:** Bearer Token — Roles: `OWNER`, `MANAGER`",
+      "item": [
+        {
+          "name": "Get Dashboard Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dashboard/?restaurant={{restaurantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "dashboard", ""],
+              "query": [
+                { "key": "restaurant", "value": "{{restaurantId}}", "description": "UUID of the restaurant to fetch dashboard data for" }
+              ]
+            },
+            "description": "Returns dashboard summary data for a specific restaurant including revenue, order counts, top-selling items, and per-order-type breakdowns.\n\n### Auth\nJWT Bearer Token — Roles: `OWNER`, `MANAGER`\n\n### Query Parameters\n| Parameter | Type | Required | Description |\n|---|---|---|---|\n| `restaurant` | UUID (string) | ✅ | The restaurant's UUID |\n\n### Response Fields\n| Field | Type | Description |\n|---|---|---|\n| `dayTitle` | string | `Today`, `Yesterday`, or last available date |\n| `restaurantInfo` | object | Current restaurant details |\n| `associatedRestaurants` | array | Other restaurants the user can switch to |\n| `date` | string | The date of the data shown |\n| `totalRevenue` | number | Total revenue for the day |\n| `totalOrders` | integer | Total number of orders |\n| `topSellingItem` | string | Name of the best-selling menu item |\n| `numberOfGuests` | integer | Total guest count |\n| `averageRevenuePerGuest` | number | Revenue divided by guests |\n| `averageRevenuePerOrder` | number | Revenue divided by orders |\n| `averageItemsPerOrder` | number | Avg items per order |\n| `averageRevenuePerItem` | number | Revenue divided by items sold |\n| `averageOrderValue` | number | Average monetary value per order |\n| `orderTypeInfoList` | array | Breakdown by order type (Dine In, Takeout, Delivery) |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"dayTitle\": \"Today\",\n    \"restaurantInfo\": {\n      \"restaurantId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"restaurantName\": \"Sunset Diner\",\n      \"restaurantAddress\": \"123 Ocean Drive, Miami, FL 33139\"\n    },\n    \"associatedRestaurants\": [\n      {\n        \"restaurantId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n        \"restaurantName\": \"Sunset Diner\",\n        \"restaurantAddress\": \"123 Ocean Drive, Miami, FL 33139\"\n      }\n    ],\n    \"date\": \"2026-02-28\",\n    \"totalRevenue\": 3450.75,\n    \"totalOrders\": 87,\n    \"topSellingItem\": \"Grilled Salmon\",\n    \"numberOfGuests\": 142,\n    \"averageRevenuePerGuest\": 24.30,\n    \"averageRevenuePerOrder\": 39.66,\n    \"averageItemsPerOrder\": 3.2,\n    \"averageRevenuePerItem\": 12.39,\n    \"averageOrderValue\": 39.66,\n    \"orderTypeInfoList\": [\n      {\n        \"orderType\": \"DINE_IN\",\n        \"numberOfOrders\": 50,\n        \"totalRevenue\": 2100.50\n      },\n      {\n        \"orderType\": \"TAKEOUT\",\n        \"numberOfOrders\": 25,\n        \"totalRevenue\": 850.25\n      },\n      {\n        \"orderType\": \"DELIVERY\",\n        \"numberOfOrders\": 12,\n        \"totalRevenue\": 500.00\n      }\n    ]\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/dashboard/?restaurant={{restaurantId}}" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Missing / Expired Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Unauthorized\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/dashboard/?restaurant={{restaurantId}}" }
+              }
+            },
+            {
+              "name": "403 Forbidden — Insufficient Role",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 403,\n  \"data\": null,\n  \"errorMessage\": \"Access forbidden: insufficient role\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/dashboard/?restaurant={{restaurantId}}" }
+              }
+            },
+            {
+              "name": "404 Not Found — No Data Available",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 404,\n  \"data\": null,\n  \"errorMessage\": \"No order data found for restaurant\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/dashboard/?restaurant={{restaurantId}}" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "POS Sync",
+      "description": "Data synchronization APIs used by POS devices to push order data to the cloud.\n\n> **Auth:** API Key — Include the restaurant's API key in the `X-API-KEY` request header.\n\n> **Note:** These are public-facing endpoints authenticated only via the `X-API-KEY` header.",
+      "item": [
+        {
+          "name": "Sync Order Headers",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-KEY", "value": "{{apiKey}}", "description": "Restaurant API key" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pos/orderheaders/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "pos", "orderheaders", "sync"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderHeaders\": [\n    {\n      \"orderId\": 1001,\n      \"orderDateTime\": \"2026-02-28T12:30:00Z\",\n      \"employeeId\": 5,\n      \"stationId\": 2,\n      \"orderType\": \"DINE_IN\",\n      \"dineInTableId\": 8,\n      \"driverEmployeeId\": null,\n      \"discountId\": null,\n      \"discountAmount\": 0.00,\n      \"amountDue\": 45.50,\n      \"cashDiscountAmount\": 0.00,\n      \"cashDiscountApprovalEmpId\": null,\n      \"subTotal\": 45.50,\n      \"guestNumber\": 3,\n      \"editTimestamp\": \"2026-02-28T12:45:00Z\",\n      \"rowGuid\": \"550e8400-e29b-41d4-a716-446655440000\"\n    },\n    {\n      \"orderId\": 1002,\n      \"orderDateTime\": \"2026-02-28T13:00:00Z\",\n      \"employeeId\": 6,\n      \"stationId\": 1,\n      \"orderType\": \"TAKEOUT\",\n      \"dineInTableId\": null,\n      \"driverEmployeeId\": null,\n      \"discountId\": 3,\n      \"discountAmount\": 5.00,\n      \"amountDue\": 22.75,\n      \"cashDiscountAmount\": 0.00,\n      \"cashDiscountApprovalEmpId\": null,\n      \"subTotal\": 27.75,\n      \"guestNumber\": 1,\n      \"editTimestamp\": \"2026-02-28T13:10:00Z\",\n      \"rowGuid\": \"550e8400-e29b-41d4-a716-446655440001\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Syncs a batch of order header records from a POS device to the cloud database.\n\n### Auth\n`X-API-KEY` header — The restaurant's API key (returned when the restaurant was created)\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderHeaders` | array | ✅ | List of order header records to sync |\n\n### Order Header Object\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderId` | integer | ✅ | Local POS order ID |\n| `orderDateTime` | string (ISO 8601) | ✅ | Date and time of the order |\n| `employeeId` | integer | ❌ | Employee who took the order |\n| `stationId` | integer | ❌ | POS station ID |\n| `orderType` | string | ❌ | `DINE_IN`, `TAKEOUT`, or `DELIVERY` |\n| `dineInTableId` | integer | ❌ | Table ID for dine-in orders |\n| `driverEmployeeId` | integer | ❌ | Driver for delivery orders |\n| `discountId` | integer | ❌ | Applied discount ID |\n| `discountAmount` | decimal | ❌ | Discount amount |\n| `amountDue` | decimal | ❌ | Final amount due |\n| `cashDiscountAmount` | decimal | ❌ | Cash discount amount |\n| `cashDiscountApprovalEmpId` | integer | ❌ | Approving employee for cash discount |\n| `subTotal` | decimal | ❌ | Pre-discount subtotal |\n| `guestNumber` | integer | ❌ | Number of guests |\n| `editTimestamp` | string (ISO 8601) | ❌ | Last edit time on POS |\n| `rowGuid` | string (UUID) | ❌ | Unique row identifier from POS |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 2,\n    \"failedRecords\": 0,\n    \"failureDetails\": null\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderheaders/sync" }
+              }
+            },
+            {
+              "name": "200 OK — Partial Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 1,\n    \"failedRecords\": 1,\n    \"failureDetails\": \"OrderId 1002: Duplicate entry skipped\"\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderheaders/sync" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Missing API Key",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Missing API Key in headers\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderheaders/sync" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Invalid API Key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Invalid API Key\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderheaders/sync" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Order Payments",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-KEY", "value": "{{apiKey}}", "description": "Restaurant API key" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pos/orderpayments/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "pos", "orderpayments", "sync"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderPayments\": [\n    {\n      \"orderPaymentId\": 2001,\n      \"orderId\": 1001,\n      \"paymentDateTime\": \"2026-02-28T12:50:00Z\",\n      \"cashierId\": 5,\n      \"nonCashierEmployeeId\": null,\n      \"paymentMethod\": \"CREDIT_CARD\",\n      \"amountTendered\": 50.00,\n      \"amountPaid\": 45.50,\n      \"employeeComp\": 0.00,\n      \"rowGuid\": \"660e8400-e29b-41d4-a716-446655440000\"\n    },\n    {\n      \"orderPaymentId\": 2002,\n      \"orderId\": 1002,\n      \"paymentDateTime\": \"2026-02-28T13:15:00Z\",\n      \"cashierId\": 6,\n      \"nonCashierEmployeeId\": null,\n      \"paymentMethod\": \"CASH\",\n      \"amountTendered\": 30.00,\n      \"amountPaid\": 22.75,\n      \"employeeComp\": 0.00,\n      \"rowGuid\": \"660e8400-e29b-41d4-a716-446655440001\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Syncs a batch of order payment records from a POS device to the cloud database.\n\n### Auth\n`X-API-KEY` header — The restaurant's API key\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderPayments` | array | ✅ | List of payment records to sync |\n\n### Order Payment Object\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderPaymentId` | integer | ✅ | Local POS payment ID |\n| `orderId` | integer | ✅ | Related order ID |\n| `paymentDateTime` | string (ISO 8601) | ✅ | Date and time of payment |\n| `cashierId` | integer | ❌ | Cashier employee ID |\n| `nonCashierEmployeeId` | integer | ❌ | Non-cashier employee involved |\n| `paymentMethod` | string | ❌ | e.g., `CASH`, `CREDIT_CARD`, `DEBIT_CARD` |\n| `amountTendered` | decimal | ❌ | Amount given by the customer |\n| `amountPaid` | decimal | ❌ | Amount actually applied to the order |\n| `employeeComp` | decimal | ❌ | Employee comp/discount amount |\n| `rowGuid` | string (UUID) | ❌ | Unique row identifier from POS |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 2,\n    \"failedRecords\": 0,\n    \"failureDetails\": null\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderpayments/sync" }
+              }
+            },
+            {
+              "name": "200 OK — Partial Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 1,\n    \"failedRecords\": 1,\n    \"failureDetails\": \"OrderPaymentId 2002: Related orderId 1002 not found\"\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderpayments/sync" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Missing API Key",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Missing API Key in headers\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderpayments/sync" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Invalid API Key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Invalid API Key\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/orderpayments/sync" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Order Transactions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-KEY", "value": "{{apiKey}}", "description": "Restaurant API key" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pos/ordertransactions/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "pos", "ordertransactions", "sync"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderTransactions\": [\n    {\n      \"orderTransactionId\": 3001,\n      \"orderId\": 1001,\n      \"menuItemId\": 42,\n      \"menuItemUnitPrice\": 18.50,\n      \"quantity\": 2.00,\n      \"extendedPrice\": 37.00,\n      \"discountId\": null,\n      \"discountAmount\": 0.00,\n      \"discountBasis\": null,\n      \"discountAmountUsed\": 0.00,\n      \"rowGuid\": \"770e8400-e29b-41d4-a716-446655440000\"\n    },\n    {\n      \"orderTransactionId\": 3002,\n      \"orderId\": 1001,\n      \"menuItemId\": 15,\n      \"menuItemUnitPrice\": 4.25,\n      \"quantity\": 2.00,\n      \"extendedPrice\": 8.50,\n      \"discountId\": null,\n      \"discountAmount\": 0.00,\n      \"discountBasis\": null,\n      \"discountAmountUsed\": 0.00,\n      \"rowGuid\": \"770e8400-e29b-41d4-a716-446655440001\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Syncs a batch of order transaction (line item) records from a POS device to the cloud database.\n\n### Auth\n`X-API-KEY` header — The restaurant's API key\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderTransactions` | array | ✅ | List of order line-item records to sync |\n\n### Order Transaction Object\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `orderTransactionId` | integer | ✅ | Local POS transaction/line-item ID |\n| `orderId` | integer | ✅ | Related order ID |\n| `menuItemId` | integer | ❌ | Menu item ID sold |\n| `menuItemUnitPrice` | decimal | ❌ | Unit price of the menu item |\n| `quantity` | decimal | ❌ | Quantity ordered |\n| `extendedPrice` | decimal | ❌ | `unitPrice × quantity` |\n| `discountId` | integer | ❌ | Applied item-level discount ID |\n| `discountAmount` | decimal | ❌ | Discount amount |\n| `discountBasis` | string | ❌ | Basis for discount (`PERCENTAGE`, `FIXED`, etc.) |\n| `discountAmountUsed` | decimal | ❌ | Actual discount amount applied |\n| `rowGuid` | string (UUID) | ❌ | Unique row identifier from POS |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 2,\n    \"failedRecords\": 0,\n    \"failureDetails\": null\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/ordertransactions/sync" }
+              }
+            },
+            {
+              "name": "200 OK — Partial Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"totalRecords\": 2,\n    \"successRecords\": 1,\n    \"failedRecords\": 1,\n    \"failureDetails\": \"OrderTransactionId 3002: Duplicate entry, skipped\"\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/ordertransactions/sync" }
+              }
+            },
+            {
+              "name": "400 Bad Request — Missing API Key",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Missing API Key in headers\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/ordertransactions/sync" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Invalid API Key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Invalid API Key\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/pos/ordertransactions/sync" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+

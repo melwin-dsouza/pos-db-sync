@@ -1,19 +1,17 @@
 package com.posdb.sync.dto.response;
 
+import lombok.*;
+
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
 public class SyncResponse {
-    public Integer totalRecords;
-    public Integer successRecords;
-    public Integer failedRecords;
-    public String message;
+    private Integer totalRecords;
+    private Integer successRecords;
+    private Integer failedRecords;
+    private String failureDetails;
 
-    public SyncResponse() {
-    }
-
-    public SyncResponse(Integer totalRecords, Integer successRecords, Integer failedRecords, String message) {
-        this.totalRecords = totalRecords;
-        this.successRecords = successRecords;
-        this.failedRecords = failedRecords;
-        this.message = message;
-    }
 }
 
