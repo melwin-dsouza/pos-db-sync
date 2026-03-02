@@ -24,10 +24,10 @@ public enum OrderTypeEnum {
         return orderType;
     }
 
-    public static String getOrderTypeByValue(int value) {
+    public static OrderTypeEnum getOrderTypeByValue(int value) {
         for (OrderTypeEnum type : OrderTypeEnum.values()) {
             if (type.intKey == value) {
-                return type.orderType;
+                return type;
             }
         }
         return null;

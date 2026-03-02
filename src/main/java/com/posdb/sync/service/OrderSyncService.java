@@ -44,7 +44,7 @@ public class OrderSyncService {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
             Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
-            StringBuilder failureMessage = new StringBuilder("........RestaurantName: " + restaurant.getName() + ".......\n .........ORDER_HEADERS........\n ");
+            StringBuilder failureMessage = new StringBuilder("\n........RestaurantName: " + restaurant.getName() + ".......\n.........ORDER_HEADERS........\n ");
 
             log.info("OrderSyncService:: Order header sync request received for restaurantId: {} with {} records",
                     restaurant.getName(), request.getOrderHeaders() != null ? request.getOrderHeaders().size() : 0);
@@ -60,23 +60,22 @@ public class OrderSyncService {
                 throw new AppException("Maximum batch size exceeded", Response.Status.BAD_REQUEST);
             }
 
-            Result result = new Result(0, 0);
+            Result result = new Result(0, 0, 0);
 
             for (OrderHeaderData data : request.getOrderHeaders()) {
-                result = processOrderHeaderData(data, restaurant, failureMessage);
-
+               result = processOrderHeaderData(data, restaurant, failureMessage, result);
             }
 
-            if (result.failCount > 0) {
+            if (result.failCount() > 0) {
                 log.warn("OrderSyncService:: Order header sync failed with some failures for restaurantId: {} - Success: {}, Failed: {}. Failure details: {}",
-                        restaurant.getName(), result.successCount, result.failCount, failureMessage);
-                throw new AppException("Order header sync completed with some failures. Success: " + result.successCount + ", Failed: " + result.failCount
-                        + "..\n FailureMessages: " + failureMessage, Response.Status.INTERNAL_SERVER_ERROR);
+                        restaurant.getName(), result.successCount(), result.failCount(), failureMessage);
+                throw new AppException("Order header sync completed with some failures. Success: " + result.successCount() + ", Failed: " + result.failCount()
+                        + ".. FailureMessages: " + failureMessage, Response.Status.INTERNAL_SERVER_ERROR);
             } else {
                 log.info("OrderSyncService:: Order header sync completed successfully for restaurantId: {} - Success: {}, Failed: {}",
-                        restaurant.getName(), result.successCount, result.failCount);
+                        restaurant.getName(), result.successCount(), result.failCount());
             }
-            return new SyncResponse(request.getOrderHeaders().size(), result.successCount, result.failCount, failureMessage.toString());
+            return new SyncResponse(request.getOrderHeaders().size(), result.successCount(), result.failCount(), failureMessage.toString());
         } catch (AppException e) {
             throw e;
         } catch (IllegalArgumentException e) {
@@ -88,12 +87,10 @@ public class OrderSyncService {
         }
     }
 
-    private Result processOrderHeaderData(OrderHeaderData data, Restaurant restaurant, StringBuilder failureMessage) {
-        int successCount = 0;
-        int failCount = 0;
-        int recordIndex = 0;
+    private Result processOrderHeaderData(OrderHeaderData data, Restaurant restaurant, StringBuilder failureMessage, Result result) {
+
         try {
-            recordIndex++;
+            int recordIndex = result.recordIndex() + 1;
             OrderHeader headerEntity = new OrderHeader();
             headerEntity.setRestaurant(restaurant);
             if (TextUtil.isEmpty(String.valueOf(data.getOrderId()))) {
@@ -112,7 +109,7 @@ public class OrderSyncService {
             headerEntity.setStationId(data.getStationId());
             headerEntity.setOrderTypeId(data.getOrderType());
             try {
-                headerEntity.setOrderType(OrderTypeEnum.valueOf(OrderTypeEnum.getOrderTypeByValue(Integer.parseInt(data.getOrderType()))));
+                headerEntity.setOrderType(OrderTypeEnum.getOrderTypeByValue(Integer.parseInt(data.getOrderType())));
             } catch (Exception ex) {
                 log.warn("OrderSyncService:: Invalid orderType in order header data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
             }
@@ -134,14 +131,14 @@ public class OrderSyncService {
             }
             headerEntity.setRowGuid(data.getRowGuid());
             headerEntity.persist();
-            successCount++;
             log.debug("OrderSyncService:: Order header synced: orderId={}, restaurantId={}", data.getOrderId(), restaurant.getName());
+            return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
-            failCount++;
+            int recordIndex = result.recordIndex() + 1;
             failureMessage.append("Failure at recordIndex: ").append(recordIndex).append(" OrderId: ").append(data.getOrderId()).append(". Error: ").append(e.getMessage()).append("\n");
             log.error("OrderSyncService:: Failed to sync order header. recordIndex: {} : orderId={}, restaurant={}", recordIndex, data.getOrderId(), restaurant.getName(), e);
+            return new Result(result.successCount(), result.failCount() + 1, recordIndex);
         }
-        return new Result(successCount, failCount);
     }
 
     @Transactional
@@ -165,9 +162,9 @@ public class OrderSyncService {
                 throw new AppException("Maximum batch size exceeded", Response.Status.BAD_REQUEST);
             }
 
-            Result result = new Result(0, 0);
+            Result result = new Result(0, 0,0);
             for (OrderPaymentData data : request.getOrderPayments()) {
-                result = processOrderPaymentData(data, restaurant, failureMessage);
+                result = processOrderPaymentData(data, restaurant, failureMessage, result);
             }
 
             if (result.failCount() > 0) {
@@ -191,13 +188,9 @@ public class OrderSyncService {
         }
     }
 
-    private Result processOrderPaymentData(OrderPaymentData data, Restaurant restaurant, StringBuilder failureMessage) {
-        int successCount = 0;
-        int failCount = 0;
-        int recordIndex = 0;
-
+    private Result processOrderPaymentData(OrderPaymentData data, Restaurant restaurant, StringBuilder failureMessage, Result result) {
         try {
-            recordIndex++;
+            int recordIndex = result.recordIndex() + 1;
             OrderPayment payment = new OrderPayment();
             payment.setRestaurant(restaurant);
             if (TextUtil.isEmpty(String.valueOf(data.getOrderId())) || TextUtil.isEmpty(String.valueOf(data.getOrderPaymentId()))) {
@@ -222,15 +215,14 @@ public class OrderSyncService {
             payment.setRowGuid(data.getRowGuid());
 
             payment.persist();
-            successCount++;
             log.debug("Order payment synced: orderPaymentId={}, restaurantId={}", data.getOrderPaymentId(), restaurant.getName());
+            return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
-            failCount++;
+            int recordIndex = result.recordIndex() + 1;
             failureMessage.append("Failure at recordIndex: ").append(recordIndex).append(" OrderId: ").append(data.getOrderId()).append(". Error: ").append(e.getMessage()).append("\n");
             log.error("OrderSyncService:: Failed to sync order payment. recordIndex: {} : orderId={}, restaurant={}", recordIndex, data.getOrderId(), restaurant.getName(), e);
+            return new Result(result.successCount(), result.failCount() + 1, recordIndex);
         }
-
-        return new Result(successCount, failCount);
     }
 
     @Transactional
@@ -254,9 +246,9 @@ public class OrderSyncService {
                 throw new AppException("Maximum batch size exceeded", Response.Status.BAD_REQUEST);
             }
 
-            Result result = new Result(0, 0);
+            Result result = new Result(0, 0,0);
             for (OrderTransactionData data : request.getOrderTransactions()) {
-                result = processOrderTransactionData(data, restaurant, failureMessage);
+                result = processOrderTransactionData(data, restaurant, failureMessage, result);
             }
 
             if (result.failCount() > 0) {
@@ -280,12 +272,9 @@ public class OrderSyncService {
         }
     }
 
-    private Result processOrderTransactionData(OrderTransactionData data, Restaurant restaurant, StringBuilder failureMessage) {
-        int successCount = 0;
-        int failCount = 0;
-        int recordIndex = 0;
+    private Result processOrderTransactionData(OrderTransactionData data, Restaurant restaurant, StringBuilder failureMessage, Result result) {
         try {
-            recordIndex++;
+            int recordIndex = result.recordIndex() + 1;
             OrderTransaction transaction = new OrderTransaction();
             transaction.setRestaurant(restaurant);
             if (TextUtil.isEmpty(String.valueOf(data.getOrderTransactionId())) || TextUtil.isEmpty(String.valueOf(data.getOrderId()))) {
@@ -304,16 +293,16 @@ public class OrderSyncService {
             transaction.setDiscountAmountUsed(data.getDiscountAmountUsed());
             transaction.setRowGuid(data.getRowGuid());
             transaction.persist();
-            successCount++;
             log.debug("OrderSyncService:: Order transaction synced: orderTransactionId={}, restaurantId={}", data.getOrderTransactionId(), restaurant.getName());
+            return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
-            failCount++;
+            int recordIndex = result.recordIndex() + 1;
             failureMessage.append("Failure at recordIndex: ").append(recordIndex).append(" OrderTransactionId: ").append(data.getOrderTransactionId()).append(". Error: ").append(e.getMessage()).append("\n");
             log.error("OrderSyncService:: Failed to sync order transaction. recordIndex: {} : orderTransactionId={}, restaurant={}", recordIndex, data.getOrderTransactionId(), restaurant.getName(), e);
+            return new Result(result.successCount(), result.failCount() + 1, recordIndex);
         }
-        return new Result(successCount, failCount);
     }
 
-    private record Result(int successCount, int failCount) {
+    private record Result(int successCount, int failCount, int recordIndex) {
     }
 }

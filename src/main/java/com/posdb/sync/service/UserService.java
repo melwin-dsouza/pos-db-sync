@@ -34,29 +34,30 @@ public class UserService {
     @Transactional
     public void changePassword(ChangePasswordRequest request) {
         try {
-            String userEmail = securityIdentity.getPrincipal().getName();
-            log.info("Password change requested for user: {}", userEmail);
+            log.info("Password change requested for user: {}", request.getEmail());
 
             if (TextUtil.isEmpty(request.getCurrentPassword()) || TextUtil.isEmpty(request.getNewPassword())) {
-                log.warn("UserService:: Password change failed - missing current or new password for user: {}", userEmail);
+                log.warn("UserService:: Password change failed - missing current or new password for user: {}", request.getEmail());
                 throw new AppException("Current password and new password are required", Response.Status.BAD_REQUEST);
             }
-            User user = User.<User>find("email = ?1", userEmail)
+            User user = User.<User>find("email = ?1", request.getEmail())
                     .firstResultOptional().orElse(null);
             if (user == null) {
-                log.warn("User not found for password change: {}", userEmail);
+                log.warn("User not found for password change: {}", request.getEmail());
                 throw new AppException("User not found", Response.Status.BAD_REQUEST);
             }
             // Verify current password
-            if (passwordUtil.verifyPassword(request.getCurrentPassword(), user.getPasswordHash())) {
-                log.warn("Password change failed - invalid current password for userId: {}", userEmail);
+            if (!passwordUtil.verifyPassword(request.getCurrentPassword(), user.getPasswordHash())) {
+                log.warn("Password change failed - invalid current password for userId: {}", request.getEmail());
                 throw new AppException("Current password is incorrect", Response.Status.BAD_REQUEST);
             }
             user.setPasswordHash(passwordUtil.hashPassword(request.getNewPassword()));
             user.setMustChangePassword(false);
             user.persist();
 
-            log.info("Password changed successfully for userId: {}", userEmail);
+            log.info("Password changed successfully for userId: {}", request.getEmail());
+        } catch (AppException e){
+            throw e;
         } catch (IllegalArgumentException e) {
             log.warn("Invalid user ID format in security context");
             throw new AppException("Invalid user ID format", Response.Status.BAD_REQUEST);

@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
 
 @ApplicationScoped
 @Slf4j
@@ -33,8 +35,9 @@ public class JwtProvider {
                     .subject(user.getEmail())
                     .claim("user_name", user.getFullName())
                     .claim("restaurant_name", user.getPrimaryRestaurant().getName())
-                    .claim("restaurants", user.getRestaurants().stream().map(Restaurant::getName).toArray())
+                    .claim("restaurants", user.getRestaurants().stream().map(Restaurant::getName).toList())
                     .claim("role", user.getRole().name())
+                    .groups(new HashSet<>(List.of(user.getRole().name())))
                     .expiresAt(Instant.now().getEpochSecond() + expireInSeconds) // 24 hours
                     .sign();
 

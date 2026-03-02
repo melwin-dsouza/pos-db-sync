@@ -33,15 +33,21 @@ public class AuthService {
             User user = User.<User>find("email", request.getEmail())
                     .firstResultOptional().orElse(null);
 
-            if (user == null || passwordUtil.verifyPassword(request.getPassword(), user.getPasswordHash())) {
+            if (user == null || !passwordUtil.verifyPassword(request.getPassword(), user.getPasswordHash())) {
                 log.warn("AuthService:: Login failed - invalid credentials for email: {}", request.getEmail());
                 throw new AppException("Invalid email or password", Response.Status.UNAUTHORIZED);
+            }
+            if(Boolean.TRUE.equals(user.getMustChangePassword())){
+                log.warn("AuthService:: Login failed - user must change password for email: {}", request.getEmail());
+                throw new AppException("User must change password", Response.Status.FORBIDDEN);
             }
 
             String token = jwtProvider.generateToken(user);
 
             log.info("AuthService:: Login successful for email: {} with userId: {}", request.getEmail(), user.getId());
             return token;
+        } catch (AppException e){
+            throw e;
         } catch (Exception e) {
             log.error("AuthService:: Error during login. ", e);
             throw new AppException("An error occurred during login", Response.Status.INTERNAL_SERVER_ERROR);

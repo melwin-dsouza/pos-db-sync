@@ -37,7 +37,7 @@ public class User extends PanacheEntityBase {
     )
     private List<Restaurant> restaurants = new ArrayList<>();
 
-    @Column(name = "email", nullable = false, length = 255)
+    @Column(name = "email", nullable = false)
     private String email;
 
     @Column(name = "mobile_number")
@@ -46,7 +46,7 @@ public class User extends PanacheEntityBase {
     @Column(name = "full_name")
     private String fullName;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Column(name = "role")

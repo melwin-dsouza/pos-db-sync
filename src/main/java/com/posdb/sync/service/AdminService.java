@@ -69,15 +69,16 @@ public class AdminService {
                 throw new AppException("Invalid role specified.", Response.Status.BAD_REQUEST);
             }
 
-            // Check if email already exists for this restaurant
-            User existingUser = User.<User>find("email = ?1 AND restaurant_id = ?2", request.getEmail(), restId)
+            // Check if email already exists
+            User existingUser = User.<User>find("email = ?1", request.getEmail())
                     .firstResultOptional().orElse(null);
             if (existingUser != null) {
-                log.warn("AdminService:: Email already exists for restaurant: {}", request.getEmail());
-                throw new AppException("Email already exists for this restaurant.", Response.Status.BAD_REQUEST);
+                log.warn("AdminService:: Email already exists : {}", request.getEmail());
+                throw new AppException("Email already exists. Link User to Restaurant", Response.Status.BAD_REQUEST);
             }
 
             String generatedPassword = keyGenerator.generatePassword();
+            log.info("AdminService:: Generated password for new user: {}", generatedPassword);
             String passwordHash = passwordUtil.hashPassword(generatedPassword);
 
             User user = new User();
@@ -92,7 +93,10 @@ public class AdminService {
             user.persist();
 
             log.info("AdminService:: Owner created successfully for restaurantId: {} with email: {}", restaurantId, request.getEmail());
-        } catch (IllegalArgumentException e) {
+        } catch (AppException e) {
+            throw e;
+        }
+        catch (IllegalArgumentException e) {
             log.warn("AdminService:: Invalid restaurantId format: {}", restaurantId);
             throw new AppException("Invalid restaurant ID format.", Response.Status.BAD_REQUEST);
         } catch (Exception e) {

@@ -12,14 +12,13 @@ import java.util.Date;
 @NoArgsConstructor
 @ToString
 public class DashboardDataDto {
-    private Long orderCount;
-    private String orderId;
+    private Integer orderId;
     private Date orderDateTime;
     private OrderTypeEnum orderType;
     private BigDecimal discountAmount;
     private BigDecimal vatAmount;
     private Integer guestNumber;
-    private String orderPaymentId;
+    private Integer orderPaymentId;
     private Date paymentDateTime;
     private String paymentMethod;
     private BigDecimal amountPaid;

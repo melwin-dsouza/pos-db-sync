@@ -16,13 +16,16 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
         // Use the built-in EntityManager for custom queries
         return getEntityManager()
                 .createQuery("SELECT new com.posdb.sync.repository.dto.DashboardDataDto(" +
-                        " COUNT(*) as order_count , oh.orderId, oh.orderDateTime, oh.orderType, oh.discountAmount, oh.vatAmount, oh.guestNumber,\" +\n" +
+                        " oh.orderId, oh.orderDateTime, oh.orderType, oh.discountAmount, oh.vatAmount, oh.guestNumber, " +
                         " op.orderPaymentId, op.paymentDateTime, op.paymentMethod, op.amountPaid) " +
-                        " FROM order_headers oh " +
-                        " JOIN order_payments op ON op.order_id = oh.id" +
-                        " WHERE oh.restaurant_id = :restaurantId " +
-                        " AND oh.order_date_time >= :startDate " +
-                        " AND oh.order_date_time <= :endDate", DashboardDataDto.class)
+                        " FROM OrderHeader oh " +
+                        " JOIN OrderPayment op ON op.orderId = oh.orderId" +
+                        " WHERE oh.restaurant.id = :restaurantId " +
+                        " AND oh.orderDateTime >= :startDate " +
+                        " AND oh.orderDateTime <= :endDate", DashboardDataDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .getResultList();
     }
 }

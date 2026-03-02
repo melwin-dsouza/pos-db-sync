@@ -27,7 +27,6 @@ public class UserResource {
 
     @POST
     @Path("/change-password")
-    @RolesAllowed({"OWNER", "MANAGER", "STAFF"})
     public Response changePassword(ChangePasswordRequest request) {
         log.info("UserResource:: Change password request received");
         userService.changePassword(request);

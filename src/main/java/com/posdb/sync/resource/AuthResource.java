@@ -26,8 +26,8 @@ public class AuthResource {
     public Response login(LoginRequest request) {
         log.info("AuthResource:: Received Login request: {}", request);
         String token = authService.login(request);
-        return Response.status(Response.Status.CREATED)
-                .entity(new ApiResponse<>(201, token, null))
+        return Response.status(Response.Status.OK)
+                .entity(new ApiResponse<>(200, token, null))
                 .build();
     }
 }

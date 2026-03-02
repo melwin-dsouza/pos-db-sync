@@ -44,5 +44,7 @@ public class AdminResource {
     }
 
     //adding restaurant under existing owner not available right now, will be done through query.
+    //instead of this better to have link restaurant and user type of api.
+    //create separate api for creating user and one more api to link restaurant to user, we already hv dedicated create restuarnt api
 }
 

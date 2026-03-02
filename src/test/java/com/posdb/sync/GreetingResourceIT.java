@@ -1,8 +1,8 @@
 package com.posdb.sync;
 
-import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.junit.QuarkusTest;
 
-@QuarkusIntegrationTest
-class GreetingResourceIT extends GreetingResourceTest {
+@QuarkusTest
+class GreetingResourceIT{
     // Execute the same tests but in packaged mode.
 }
