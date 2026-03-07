@@ -6,10 +6,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -50,7 +52,7 @@ public class Restaurant extends PanacheEntityBase {
     private List<User> userList = new ArrayList<>();
 
     @Column(name = "last_sync_time")
-    private Date lastSyncTime;
+    private OffsetDateTime lastSyncTime;
 
     @Column(name = "opening_time")
     public LocalTime openingTime; // Maps to TIME in DB
@@ -58,21 +60,21 @@ public class Restaurant extends PanacheEntityBase {
     @Column(name = "closing_time")
     public LocalTime closingTime; // Maps to TIME in DB
 
-    @Column(name = "created_at")
-    private Date createdAt;
+    @Column(name = "time_zone")
+    private String timeZone;
 
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private OffsetDateTime createdAt;
+
+    @UpdateTimestamp
     @Column(name = "updated_at")
-    private Date updatedAt;
+    private OffsetDateTime updatedAt;
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = new Date();
         this.status = "ACTIVE";
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = new Date();
-    }
 }
 

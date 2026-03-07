@@ -1,8 +1,10 @@
-package com.posdb.sync.dto.table;
+package com.posdb.sync.dto.sync;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 @Getter
 @Setter
@@ -11,14 +13,24 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class OrderPaymentData {
     private Integer orderPaymentId;
-    private String paymentDateTime;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    private OffsetDateTime paymentDateTime;
+
     private Integer cashierId;
+
     private Integer nonCashierEmployeeId;
+
     private Integer orderId;
+
     private String paymentMethod;
+
     private BigDecimal amountTendered;
+
     private BigDecimal amountPaid;
+
     private BigDecimal employeeComp;
+
     private String rowGuid;
 }
 

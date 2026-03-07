@@ -1,6 +1,5 @@
-package com.posdb.sync.dto.request;
+package com.posdb.sync.dto.sync;
 
-import com.posdb.sync.dto.table.OrderTransactionData;
 import lombok.*;
 
 import java.util.List;

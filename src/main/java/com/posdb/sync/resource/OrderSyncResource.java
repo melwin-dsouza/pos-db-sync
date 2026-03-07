@@ -1,9 +1,9 @@
 package com.posdb.sync.resource;
 
-import com.posdb.sync.dto.request.OrderHeaderSyncRequest;
+import com.posdb.sync.dto.sync.OrderHeaderSyncRequest;
 import com.posdb.sync.dto.response.ApiResponse;
-import com.posdb.sync.dto.request.OrderPaymentSyncRequest;
-import com.posdb.sync.dto.request.OrderTransactionSyncRequest;
+import com.posdb.sync.dto.sync.OrderPaymentSyncRequest;
+import com.posdb.sync.dto.sync.OrderTransactionSyncRequest;
 import com.posdb.sync.dto.response.SyncResponse;
 import com.posdb.sync.service.OrderSyncService;
 import jakarta.enterprise.context.RequestScoped;

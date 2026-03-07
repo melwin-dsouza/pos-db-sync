@@ -1,12 +1,7 @@
 package com.posdb.sync.service;
 
-import com.posdb.sync.dto.request.OrderHeaderSyncRequest;
-import com.posdb.sync.dto.request.OrderPaymentSyncRequest;
-import com.posdb.sync.dto.request.OrderTransactionSyncRequest;
 import com.posdb.sync.dto.response.SyncResponse;
-import com.posdb.sync.dto.table.OrderHeaderData;
-import com.posdb.sync.dto.table.OrderPaymentData;
-import com.posdb.sync.dto.table.OrderTransactionData;
+import com.posdb.sync.dto.sync.*;
 import com.posdb.sync.entity.OrderHeader;
 import com.posdb.sync.entity.OrderPayment;
 import com.posdb.sync.entity.OrderTransaction;
@@ -23,9 +18,6 @@ import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.text.ParseException;
-import java.util.Date;
-
 import static com.posdb.sync.dto.constants.AppConstants.API_KEY;
 
 @ApplicationScoped
@@ -34,7 +26,6 @@ public class OrderSyncService {
 
     @ConfigProperty(name = "pos.sync.batch.size", defaultValue = "500")
     Integer maxBatchSize;
-
 
     @Inject
     ApiKeyValidatorService apiKeyValidatorService;
@@ -57,7 +48,7 @@ public class OrderSyncService {
             if (request.getOrderHeaders().size() > maxBatchSize) {
                 log.warn("OrderSyncService:: Order headers batch size {} exceeds maximum {} for restaurantId: {}",
                         request.getOrderHeaders().size(), maxBatchSize, restaurant.getName());
-                throw new AppException("Maximum batch size exceeded", Response.Status.BAD_REQUEST);
+                throw new AppException("Maximum batch size exceeded .", Response.Status.BAD_REQUEST);
             }
 
             Result result = new Result(0, 0, 0);
@@ -69,18 +60,20 @@ public class OrderSyncService {
             if (result.failCount() > 0) {
                 log.warn("OrderSyncService:: Order header sync failed with some failures for restaurantId: {} - Success: {}, Failed: {}. Failure details: {}",
                         restaurant.getName(), result.successCount(), result.failCount(), failureMessage);
-                throw new AppException("Order header sync completed with some failures. Success: " + result.successCount() + ", Failed: " + result.failCount()
+                throw new AppException("Order header sync completed with some failures. Success: " + result.successCount() + " , Failed: " + result.failCount()
                         + ".. FailureMessages: " + failureMessage, Response.Status.INTERNAL_SERVER_ERROR);
             } else {
                 log.info("OrderSyncService:: Order header sync completed successfully for restaurantId: {} - Success: {}, Failed: {}",
                         restaurant.getName(), result.successCount(), result.failCount());
+                restaurant.setLastSyncTime(java.time.OffsetDateTime.now());
+                restaurant.persist();
             }
             return new SyncResponse(request.getOrderHeaders().size(), result.successCount(), result.failCount(), failureMessage.toString());
         } catch (AppException e) {
             throw e;
         } catch (IllegalArgumentException e) {
             log.warn("OrderSyncService::syncOrderHeaders API key validation failed: {}", e.getMessage());
-            throw new AppException("Invalid or missing API key", Response.Status.UNAUTHORIZED);
+            throw new AppException("Invalid or missing API key .", Response.Status.UNAUTHORIZED);
         } catch (Exception e) {
             log.error("OrderSyncService::syncOrderHeaders Error syncing order headers", e);
             throw new AppException("Failed to sync order headers. ", Response.Status.INTERNAL_SERVER_ERROR);
@@ -98,13 +91,7 @@ public class OrderSyncService {
                 throw new AppException("orderId is required for order header. Index: " + recordIndex, Response.Status.BAD_REQUEST);
             }
             headerEntity.setOrderId(data.getOrderId());
-            try {
-                Date parsedDate = TextUtil.parseDate(data.getOrderDateTime());
-                headerEntity.setOrderDateTime(parsedDate);
-            } catch (ParseException ex) {
-                log.warn("OrderSyncService:: Parse Error orderDateTime in order header data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
-                throw new AppException("orderDateTime is incorrect for  order header. Index: " + recordIndex, Response.Status.BAD_REQUEST);
-            }
+            headerEntity.setOrderDateTime(data.getOrderDateTime());
             headerEntity.setEmployeeId(data.getEmployeeId());
             headerEntity.setStationId(data.getStationId());
             headerEntity.setOrderTypeId(data.getOrderType());
@@ -122,20 +109,14 @@ public class OrderSyncService {
             headerEntity.setCashDiscountApprovalEmpId(data.getCashDiscountApprovalEmpId());
             headerEntity.setSubTotal(data.getSubTotal());
             headerEntity.setGuestNumber(data.getGuestNumber());
-            try {
-                Date parsedDate = TextUtil.parseDate(data.getEditTimestamp());
-                headerEntity.setEditTimestamp(parsedDate);
-            } catch (ParseException ex) {
-                log.warn("OrderSyncService:: Parse Error editTimestamp in order header data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
-                throw new AppException("editTimestamp is incorrect for  order header. Index: " + recordIndex, Response.Status.BAD_REQUEST);
-            }
+            headerEntity.setEditTimestamp(data.getEditTimestamp());
             headerEntity.setRowGuid(data.getRowGuid());
             headerEntity.persist();
             log.debug("OrderSyncService:: Order header synced: orderId={}, restaurantId={}", data.getOrderId(), restaurant.getName());
             return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
             int recordIndex = result.recordIndex() + 1;
-            failureMessage.append("Failure at recordIndex: ").append(recordIndex).append(" OrderId: ").append(data.getOrderId()).append(". Error: ").append(e.getMessage()).append("\n");
+            failureMessage.append("Failure at recordIndex : ").append(recordIndex).append(" OrderId: ").append(data.getOrderId()).append(". Error: ").append(e.getMessage()).append("\n");
             log.error("OrderSyncService:: Failed to sync order header. recordIndex: {} : orderId={}, restaurant={}", recordIndex, data.getOrderId(), restaurant.getName(), e);
             return new Result(result.successCount(), result.failCount() + 1, recordIndex);
         }
@@ -175,6 +156,8 @@ public class OrderSyncService {
             } else {
                 log.info("OrderSyncService:: Order payment sync completed successfully for restaurantId: {} - Success: {}, Failed: {}",
                         restaurant.getName(), result.successCount(), result.failCount());
+                restaurant.setLastSyncTime(java.time.OffsetDateTime.now());
+                restaurant.persist();
             }
             return new SyncResponse(request.getOrderPayments().size(), result.successCount(), result.failCount(), failureMessage.toString());
         } catch (AppException e) {
@@ -199,13 +182,7 @@ public class OrderSyncService {
             }
             payment.setOrderPaymentId(data.getOrderPaymentId());
             payment.setOrderId(data.getOrderId());
-            try {
-                Date parsedDate = TextUtil.parseDate(data.getPaymentDateTime());
-                payment.setPaymentDateTime(parsedDate);
-            } catch (ParseException ex) {
-                log.warn("OrderSyncService:: Parse Error paymentDateTime in order payment data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
-                throw new AppException("paymentDateTime is incorrect for  order payment. Index: " + recordIndex, Response.Status.BAD_REQUEST);
-            }
+            payment.setPaymentDateTime(data.getPaymentDateTime());
             payment.setCashierId(data.getCashierId());
             payment.setNonCashierEmployeeId(data.getNonCashierEmployeeId());
             payment.setPaymentMethod(data.getPaymentMethod());
@@ -213,7 +190,6 @@ public class OrderSyncService {
             payment.setAmountPaid(data.getAmountPaid());
             payment.setEmployeeComp(data.getEmployeeComp());
             payment.setRowGuid(data.getRowGuid());
-
             payment.persist();
             log.debug("Order payment synced: orderPaymentId={}, restaurantId={}", data.getOrderPaymentId(), restaurant.getName());
             return new Result(result.successCount() + 1, result.failCount(), recordIndex);
@@ -259,6 +235,8 @@ public class OrderSyncService {
             } else {
                 log.info("OrderSyncService:: Order transaction sync completed successfully for restaurantId: {} - Success: {}, Failed: {}",
                         restaurant.getName(), result.successCount(), result.failCount());
+                restaurant.setLastSyncTime(java.time.OffsetDateTime.now());
+                restaurant.persist();
             }
             return new SyncResponse(request.getOrderTransactions().size(), result.successCount(), result.failCount(), failureMessage.toString());
         } catch (AppException e) {

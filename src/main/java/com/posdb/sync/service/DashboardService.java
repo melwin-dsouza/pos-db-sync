@@ -20,6 +20,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -59,18 +60,22 @@ public class DashboardService {
             }
             UUID restaurantUuid = selectedRestaurant.getId();
 
+            LocalDate yesterday = LocalDate.now().minusDays(1); // Get yesterday's date
             BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
-                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime());
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), yesterday, selectedRestaurant.getTimeZone());
 
 
-            List<DashboardDataDto> dashboardData = dashboardRepository.getDashboardData(restaurantUuid, businessWindow.getStart(), businessWindow.getEnd());
+            List<DashboardDataDto> dashboardData = dashboardRepository.getDashboardData(restaurantUuid, businessWindow.start(), businessWindow.end());
             response.setDayTitle("Yesterday");
-            response.setDate(businessWindow.getStart().toString());
+            response.setDayOfWeek(yesterday.getDayOfWeek().name());
+            response.setStartDateTime(businessWindow.start().toString());
+            response.setEndDateTime(businessWindow.end().toString());
             response.setTotalOrders(dashboardData.size());
-            response.setTotalRevenue(dashboardData.stream().mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
-            response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream()
+            response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
+                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
+            response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
                     .mapToDouble(d -> d.getAmountPaid().doubleValue()).average().orElse(0));
-            response.setNumberOfGuests(dashboardData.stream().mapToInt(DashboardDataDto::getGuestNumber).sum());
+            response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
 
             List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
             Map<OrderTypeEnum, List<DashboardDataDto>> typeListMap = dashboardData.stream()
@@ -79,12 +84,12 @@ public class DashboardService {
             for (Map.Entry<OrderTypeEnum, List<DashboardDataDto>> entry : typeListMap.entrySet()) {
                 log.info("Order type: {}, count: {}", entry.getKey(), entry.getValue().size());
                 orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), entry.getValue().size(),
-                        entry.getValue().stream().mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
+                        entry.getValue().stream().filter(d -> d.getAmountPaid() != null).mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
             }
             response.setOrderTypeInfoList(orderTypeInfoList);
             setRestaurantListInfo(user, response);
             log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders",
-                    restaurantId, response.getDate(), response.getTotalOrders());
+                    restaurantId, response.getStartDateTime(), response.getTotalOrders());
 
 
             return response;
@@ -252,4 +257,61 @@ public class DashboardService {
     }
 
 
+    public DashboardResponse getDashboardDataByDate(String restaurantId, LocalDate selectedDate) {
+        try {
+            String userEmail = securityIdentity.getPrincipal().getName();
+            log.info("Dashboard data report requested for user: {} for date {}", userEmail, selectedDate);
+            User user = User.<User>find("email = ?1", userEmail)
+                    .firstResultOptional().orElse(null);
+            if (user == null) {
+                log.warn("User not found for Get DashboardData request : {} .", userEmail);
+                throw new AppException("User not found", Response.Status.BAD_REQUEST);
+            }
+
+            DashboardResponse response = new DashboardResponse();
+
+            Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, response);
+            if(selectedRestaurant == null) {
+                log.warn("No restaurant selected for DashboardData request for user: {} .", userEmail);
+                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+            }
+            UUID restaurantUuid = selectedRestaurant.getId();
+
+            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), selectedDate, selectedRestaurant.getTimeZone());
+
+
+            List<DashboardDataDto> dashboardData = dashboardRepository.getDashboardData(restaurantUuid, businessWindow.start(), businessWindow.end());
+            response.setDayTitle(selectedDate.toString());
+            response.setDayOfWeek(selectedDate.getDayOfWeek().name());
+            response.setStartDateTime(businessWindow.start().toString());
+            response.setEndDateTime(businessWindow.end().toString());
+            response.setTotalOrders(dashboardData.size());
+            response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
+                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
+            response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
+                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).average().orElse(0));
+            response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
+
+            List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
+            Map<OrderTypeEnum, List<DashboardDataDto>> typeListMap = dashboardData.stream()
+                    .filter(d -> d.getOrderType() != null)
+                    .collect(Collectors.groupingBy(DashboardDataDto::getOrderType));
+            for (Map.Entry<OrderTypeEnum, List<DashboardDataDto>> entry : typeListMap.entrySet()) {
+                log.info("Order type: {} ., count: {} .", entry.getKey(), entry.getValue().size());
+                orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), entry.getValue().size(),
+                        entry.getValue().stream().filter(d -> d.getAmountPaid() != null)
+                                .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
+            }
+            response.setOrderTypeInfoList(orderTypeInfoList);
+            setRestaurantListInfo(user, response);
+            log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders .",
+                    restaurantId, response.getStartDateTime(), response.getTotalOrders());
+
+            return response;
+        } catch (Exception e) {
+            log.error("Error generating daily orders report", e);
+            throw new AppException("Failed to generate dashboard data", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

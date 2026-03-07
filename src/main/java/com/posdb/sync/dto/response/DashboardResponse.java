@@ -11,11 +11,13 @@ import java.util.List;
 @ToString
 public class DashboardResponse {
     private String dayTitle;//Today, Yesterday, or Date (last available data)
+    private String dayOfWeek;
 
     private RestaurantInfo restaurantInfo;
     private List<RestaurantInfo> associatedRestaurants;
 
-    private String date;
+    private String startDateTime;
+    private String endDateTime;
     private Double totalRevenue;
 
     private Integer totalOrders;

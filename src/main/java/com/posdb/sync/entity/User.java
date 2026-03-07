@@ -7,9 +7,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,24 +58,18 @@ public class User extends PanacheEntityBase {
     @Column(name = "must_change_password", nullable = false)
     private Boolean mustChangePassword;
 
+    @CreationTimestamp
     @Column(name = "created_at")
-    private Date createdAt;
+    private OffsetDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at")
-    private Date updatedAt;
-
-
+    private OffsetDateTime updatedAt;
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = new Date();
-        this.updatedAt = new Date();
         this.mustChangePassword = true;
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = new Date();
-    }
 }
 

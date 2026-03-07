@@ -5,14 +5,14 @@ import com.posdb.sync.repository.dto.DashboardDataDto;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import java.util.Date;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @ApplicationScoped
 public class DashboardRepository implements PanacheRepository<OrderHeader> {
 
-    public List<DashboardDataDto> getDashboardData(UUID restaurantId, Date startDate, Date endDate) {
+    public List<DashboardDataDto> getDashboardData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
         // Use the built-in EntityManager for custom queries
         return getEntityManager()
                 .createQuery("SELECT new com.posdb.sync.repository.dto.DashboardDataDto(" +

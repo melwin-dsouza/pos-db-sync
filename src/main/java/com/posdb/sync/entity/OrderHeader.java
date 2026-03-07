@@ -6,9 +6,11 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "order_headers")
@@ -30,7 +32,7 @@ public class OrderHeader extends PanacheEntityBase {
     private Integer orderId;
 
     @Column(name = "order_date_time", nullable = false)
-    private Date orderDateTime;
+    private OffsetDateTime orderDateTime;
 
     @Column(name = "employee_id")
     private Integer employeeId;
@@ -85,27 +87,18 @@ public class OrderHeader extends PanacheEntityBase {
     private Integer guestNumber;
 
     @Column(name = "edit_timestamp")
-    private Date editTimestamp;
+    private OffsetDateTime editTimestamp;
 
     @Column(name = "row_guid")
     private String rowGuid;
 
+    @CreationTimestamp
     @Column(name = "created_at")
-    private Date createdAt;
+    private OffsetDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at")
-    private Date updatedAt;
+    private OffsetDateTime updatedAt;
 
-
-    @PrePersist
-    public void prePersist() {
-        createdAt = new Date();
-        updatedAt = new Date();
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        updatedAt = new Date();
-    }
 }
 
