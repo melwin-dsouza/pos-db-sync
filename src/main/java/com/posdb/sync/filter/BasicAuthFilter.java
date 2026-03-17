@@ -1,6 +1,7 @@
 package com.posdb.sync.filter;
 
 import com.posdb.sync.dto.response.ApiResponse;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -18,6 +19,7 @@ import static com.posdb.sync.dto.constants.AppConstants.API_KEY;
 
 @Provider
 @ApplicationScoped
+@Priority(2000)
 public class BasicAuthFilter implements ContainerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(BasicAuthFilter.class);
 

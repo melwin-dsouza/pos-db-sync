@@ -292,7 +292,8 @@ public class DashboardService {
             response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
                     .mapToDouble(d -> d.getAmountPaid().doubleValue()).average().orElse(0));
             response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
-
+            response.setTotalDiscounts(dashboardData.stream().filter(d -> d.getDiscountAmount() != null)
+                    .mapToDouble(d -> d.getDiscountAmount().doubleValue()).sum());
             List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
             Map<OrderTypeEnum, List<DashboardDataDto>> typeListMap = dashboardData.stream()
                     .filter(d -> d.getOrderType() != null)

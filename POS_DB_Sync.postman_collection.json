@@ -147,7 +147,7 @@
     },
     {
       "name": "Auth",
-      "description": "Authentication APIs. Public — no authentication required.",
+      "description": "Authentication APIs.\n\n- `POST /login` — Public, no auth required. Returns JWT in body (mobile) + sets HttpOnly cookie (web).\n- `GET /session` — Validates active session (cookie or Bearer). Used by web PWA on restart.\n- `POST /logout` — Public. Clears the `auth_token` HttpOnly cookie.",
       "item": [
         {
           "name": "Login",
@@ -159,7 +159,8 @@
                   "var jsonData = pm.response.json();",
                   "if (jsonData && jsonData.data) {",
                   "    pm.collectionVariables.set('jwtToken', jsonData.data);",
-                  "    console.log('JWT Token saved to collection variable: jwtToken');",
+                  "    console.log('✅ JWT Token saved to collection variable: jwtToken');",
+                  "    console.log('ℹ️  Web clients: auth_token HttpOnly cookie is also set in Set-Cookie response header');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -181,15 +182,18 @@
               "raw": "{\n  \"email\": \"owner@sunsetdiner.com\",\n  \"password\": \"YourPassword123\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Authenticates a user (restaurant owner / manager / staff) and returns a signed JWT token.\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `email` | string | ✅ | Registered email address |\n| `password` | string | ✅ | Account password |\n\n### Auth\nPublic — No authentication required.\n\n### Response\nThe `data` field contains the raw JWT token string. Include it in subsequent requests as:\n```\nAuthorization: Bearer <token>\n```\n\n### Notes\n- Token expiry: **1 hour**\n- After successful login, this request's test script automatically saves the token to the `jwtToken` collection variable."
+            "description": "Authenticates a user and serves both mobile and web clients from a single endpoint.\n\n### Auth\nPublic — No authentication required.\n\n### Request Body\n| Field | Type | Required | Description |\n|---|---|---|---|\n| `email` | string | ✅ | Registered email address |\n| `password` | string | ✅ | Account password |\n\n### Response Behaviour\n| Client | How to use |\n|---|---|\n| **Mobile (Android)** | Read JWT from `data` field in response body. Send as `Authorization: Bearer <token>` on all subsequent requests. |\n| **Web (PWA)** | Browser auto-stores the `auth_token` HttpOnly cookie from `Set-Cookie` response header. Cookie is sent automatically — no manual handling needed. |\n\n### Response Headers (Web)\n```\nSet-Cookie: auth_token=<jwt>; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax\n```\n\n### Notes\n- Token expiry: **24 hours** (86400 seconds)\n- `mustChangePassword = true` → login blocked, user must call `/user/change-password` first\n- After successful login, this request's test script automatically saves the token to the `jwtToken` collection variable"
           },
           "response": [
             {
-              "name": "201 — Success",
-              "status": "Created",
-              "code": 201,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"status\": 201,\n  \"data\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lckBzdW5zZXRkaW5lci5jb20iLCJpc3MiOiJwb3MtZGItc3luYyIsImF1ZCI6InBvcy1tb2JpbGUtYXBwIiwicm9sZXMiOlsiT1dORVIiXSwiaWF0IjoxNzA5MTIzNDU2LCJleHAiOjE3MDkxMjcwNTZ9.signature\",\n  \"errorMessage\": null\n}",
+              "name": "200 OK — Success (Mobile + Web)",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Set-Cookie", "value": "auth_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lckBzdW5zZXRkaW5lci5jb20iLCJpc3MiOiJwb3MtZGItc3luYyIsImF1ZCI6InBvcy1tb2JpbGUtYXBwIiwidXNlcl9uYW1lIjoiSm9obiBTbWl0aCIsInJlc3RhdXJhbnRfbmFtZSI6IlN1bnNldCBEaW5lciIsInJvbGUiOiJPV05FUiIsImV4cCI6MTc0MTk1NTIwMH0.signature; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax" }
+              ],
+              "body": "{\n  \"status\": 200,\n  \"data\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lckBzdW5zZXRkaW5lci5jb20iLCJpc3MiOiJwb3MtZGItc3luYyIsImF1ZCI6InBvcy1tb2JpbGUtYXBwIiwidXNlcl9uYW1lIjoiSm9obiBTbWl0aCIsInJlc3RhdXJhbnRfbmFtZSI6IlN1bnNldCBEaW5lciIsInJvbGUiOiJPV05FUiIsImV4cCI6MTc0MTk1NTIwMH0.signature\",\n  \"errorMessage\": null\n}",
               "originalRequest": {
                 "method": "POST",
                 "url": { "raw": "{{baseUrl}}/api/v1/auth/login" },
@@ -215,10 +219,100 @@
               "status": "Bad Request",
               "code": 400,
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Email and password are required\"\n}",
+              "body": "{\n  \"status\": 400,\n  \"data\": null,\n  \"errorMessage\": \"Email and Password are required\"\n}",
               "originalRequest": {
                 "method": "POST",
                 "url": { "raw": "{{baseUrl}}/api/v1/auth/login" }
+              }
+            },
+            {
+              "name": "403 Forbidden — Must Change Password",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 403,\n  \"data\": null,\n  \"errorMessage\": \"User must change password\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/login" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}", "description": "Mobile clients: send JWT Bearer token. Web clients: omit this header — cookie is sent automatically by the browser." }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "session"]
+            },
+            "description": "Validates the current session and returns user identity claims from the JWT.\n\nPrimarily used by **web PWA clients on app restart** to check whether the stored `auth_token` cookie is still valid without forcing the user to re-login.\n\n### Auth\n- **Web (PWA):** Browser sends `auth_token` HttpOnly cookie automatically. No manual token handling needed.\n- **Mobile:** Send `Authorization: Bearer <token>` header.\n\n### How it works\n1. `CookieTokenFilter` intercepts the request.\n2. If no `Authorization` header is present, it reads the `auth_token` cookie and injects it as a `Bearer` token.\n3. Quarkus SmallRye JWT validates the token and sets `SecurityIdentity`.\n4. Endpoint extracts and returns all user claims.\n\n### Response Fields\n| Field | Type | Description |\n|---|---|---|\n| `email` | string | User's email (JWT subject) |\n| `fullName` | string | User's full name from JWT claim |\n| `role` | string | User role: `OWNER`, `MANAGER`, or `STAFF` |\n| `restaurantName` | string | Primary restaurant name from JWT claim |\n| `restaurants` | array of strings | All restaurants the user has access to |\n| `valid` | boolean | Always `true` when session is active |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Session Valid",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 200,\n  \"data\": {\n    \"email\": \"owner@sunsetdiner.com\",\n    \"fullName\": \"John Smith\",\n    \"role\": \"OWNER\",\n    \"restaurantName\": \"Sunset Diner\",\n    \"restaurants\": [\n      \"Sunset Diner\",\n      \"Sunrise Cafe\"\n    ],\n    \"valid\": true\n  },\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/session" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — No Cookie / Token Expired",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Session is invalid or expired\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/session" }
+              }
+            },
+            {
+              "name": "401 Unauthorized — Invalid / Tampered Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"data\": null,\n  \"errorMessage\": \"Session validation failed\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/session" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "Logs out the current user by expiring the `auth_token` HttpOnly cookie.\n\n### Auth\nPublic — No authentication required. Works even if the token is already expired.\n\n### Behaviour by client\n| Client | Behaviour |\n|---|---|\n| **Web (PWA)** | Server sets `Set-Cookie: auth_token=; Max-Age=0` which instructs the browser to delete the cookie immediately. |\n| **Mobile** | No cookie is involved. Mobile clients should simply discard the JWT token locally (e.g., clear from secure storage). |\n\n### Response Headers (Web)\n```\nSet-Cookie: auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax\n```\n\n### Notes\n- No request body needed.\n- Since JWT is stateless, the token itself is not invalidated server-side — it will expire naturally after 24 hours. For immediate revocation, implement a token blacklist."
+          },
+          "response": [
+            {
+              "name": "200 OK — Logged Out Successfully",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Set-Cookie", "value": "auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" }
+              ],
+              "body": "{\n  \"status\": 200,\n  \"data\": \"Logged out successfully\",\n  \"errorMessage\": null\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{baseUrl}}/api/v1/auth/logout" }
               }
             }
           ]

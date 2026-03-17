@@ -23,6 +23,7 @@ public class DashboardResponse {
     private Integer totalOrders;
     private String topSellingItem;
     private Integer numberOfGuests;
+    private Double totalDiscounts;
     private Double averageRevenuePerGuest;
     private Double averageRevenuePerOrder;
     private Double averageItemsPerOrder;
