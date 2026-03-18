@@ -8,6 +8,7 @@ import com.posdb.sync.exception.AppException;
 import com.posdb.sync.repository.DashboardRepository;
 import com.posdb.sync.repository.dto.DashboardDataDto;
 import com.posdb.sync.repository.dto.DetailedReportDataDto;
+import com.posdb.sync.repository.dto.MonthlyReportDataDto;
 import com.posdb.sync.utils.BusinessWindowUtil;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,8 +19,10 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -59,7 +62,7 @@ public class DashboardService {
             UUID restaurantUuid = selectedRestaurant.getId();
 
             LocalDate yesterday = LocalDate.now().minusDays(1); // Get yesterday's date
-            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
+            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), yesterday, selectedRestaurant.getTimeZone());
 
 
@@ -275,7 +278,7 @@ public class DashboardService {
             }
             UUID restaurantUuid = selectedRestaurant.getId();
 
-            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
+            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), selectedDate, selectedRestaurant.getTimeZone());
 
 
@@ -335,7 +338,7 @@ public class DashboardService {
             }
             UUID restaurantUuid = selectedRestaurant.getId();
 
-            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
+            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
                     selectedDate, selectedRestaurant.getTimeZone());
 
@@ -405,6 +408,90 @@ public class DashboardService {
         } catch (Exception e) {
             log.error("Error generating daily detailed report", e);
             throw new AppException("Failed to generate daily detailed report", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public MonthlyReportResponse getMonthlyReport(String restaurantId, String monthStr) {
+        try {
+            String userEmail = securityIdentity.getPrincipal().getName();
+            log.info("Monthly report requested for user: {} for month: {}", userEmail, monthStr);
+
+            User user = User.<User>find("email = ?1", userEmail)
+                    .firstResultOptional().orElse(null);
+            if (user == null) {
+                log.warn("User not found for monthly report request: {}", userEmail);
+                throw new AppException("User not found", Response.Status.BAD_REQUEST);
+            }
+
+            DashboardResponse tempResponse = new DashboardResponse();
+            Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
+            if (selectedRestaurant == null) {
+                log.warn("No restaurant selected for monthly report request for user: {}", userEmail);
+                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+            }
+            UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Parse month string (expected format: YYYY-MM)
+            YearMonth yearMonth = YearMonth.parse(monthStr);
+            LocalDate monthStart = yearMonth.atDay(1);
+            LocalDate monthEnd = yearMonth.atEndOfMonth();
+
+            // Get business windows for month start and end
+            BusinessWindowUtil.BusinessWindow startWindow = BusinessWindowUtil.getBusinessWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
+                    monthStart, selectedRestaurant.getTimeZone());
+
+            BusinessWindowUtil.BusinessWindow endWindow = BusinessWindowUtil.getBusinessWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
+                    monthEnd, selectedRestaurant.getTimeZone());
+
+            OffsetDateTime monthStartDateTime = startWindow.start();
+            OffsetDateTime monthEndDateTime = endWindow.end();
+
+            // Fetch monthly data grouped by order type
+            List<MonthlyReportDataDto> monthlyData = dashboardRepository.getMonthlyReportData(
+                    restaurantUuid, monthStartDateTime, monthEndDateTime);
+
+            // Calculate total revenue
+            BigDecimal totalRevenue = monthlyData.stream()
+                    .map(MonthlyReportDataDto::getSumOfAmountPaid)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Build breakdown by order type
+            List<OrderTypeDto> orderTypeList = new ArrayList<>();
+            for (MonthlyReportDataDto item : monthlyData) {
+                OrderTypeDto typeDto = new OrderTypeDto();
+                typeDto.setOrderType(item.getOrderType() != null ? item.getOrderType().name() : "UNKNOWN");
+                typeDto.setNumberOfOrders(item.getNumberOfOrders().intValue());
+                typeDto.setSumOfAmountPaid(item.getSumOfAmountPaid());
+
+                // Calculate percentage of total revenue
+                double percentage = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                        ? (item.getSumOfAmountPaid().doubleValue() / totalRevenue.doubleValue()) * 100
+                        : 0.0;
+                typeDto.setPercentageOfTotalRevenue(Math.round(percentage * 100.0) / 100.0);
+
+                orderTypeList.add(typeDto);
+            }
+
+            // Build response
+            MonthlyReportResponse response = new MonthlyReportResponse();
+            response.setMonthName(yearMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+            response.setTotalMonthlyRevenue(totalRevenue);
+            response.setMonthStartDate(monthStart);
+            response.setMonthEndDate(monthEnd);
+            response.setByOrderTypeList(orderTypeList);
+
+            log.info("Monthly report generated successfully for restaurantId: {} for month: {} with total revenue: {}",
+                    restaurantId, monthStr, totalRevenue);
+
+            return response;
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error generating monthly report", e);
+            throw new AppException("Failed to generate monthly report", Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
 

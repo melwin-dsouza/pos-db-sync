@@ -4,7 +4,7 @@ import java.time.*;
 
 public class BusinessWindowUtil {
 
-    public static BusinessWindow getYesterdayWindow(LocalTime openTime, LocalTime closeTime, LocalDate referenceDate, String timeZone) {
+    public static BusinessWindow getBusinessWindow(LocalTime openTime, LocalTime closeTime, LocalDate referenceDate, String timeZone) {
         LocalDateTime startDateTime;
         LocalDateTime endDateTime;
         if (closeTime.isAfter(openTime)) {

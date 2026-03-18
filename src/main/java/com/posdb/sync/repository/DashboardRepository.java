@@ -3,6 +3,7 @@ package com.posdb.sync.repository;
 import com.posdb.sync.entity.OrderHeader;
 import com.posdb.sync.repository.dto.DashboardDataDto;
 import com.posdb.sync.repository.dto.DetailedReportDataDto;
+import com.posdb.sync.repository.dto.MonthlyReportDataDto;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -46,6 +47,25 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " ORDER BY oh.orderId, ot.orderTransactionId", DetailedReportDataDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
+    public List<MonthlyReportDataDto> getMonthlyReportData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        String query = "SELECT new com.posdb.sync.repository.dto.MonthlyReportDataDto(" +
+                " oh.orderType, COUNT(DISTINCT oh.orderId), COALESCE(SUM(op.amountPaid), 0))" +
+                " FROM OrderHeader oh " +
+                " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
+                " WHERE oh.restaurant.id = :restaurantId " +
+                " AND oh.orderDateTime >= :startDate " +
+                " AND oh.orderDateTime <= :endDate " +
+                " GROUP BY oh.orderType " +
+                " ORDER BY COALESCE(SUM(op.amountPaid), 0) DESC";
+
+        return getEntityManager()
+                .createQuery(query, MonthlyReportDataDto.class)
                 .setParameter("restaurantId", restaurantId)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)

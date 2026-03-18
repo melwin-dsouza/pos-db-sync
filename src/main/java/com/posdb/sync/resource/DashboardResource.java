@@ -3,6 +3,7 @@ package com.posdb.sync.resource;
 import com.posdb.sync.dto.response.ApiResponse;
 import com.posdb.sync.dto.response.DailyDetailedReportResponse;
 import com.posdb.sync.dto.response.DashboardResponse;
+import com.posdb.sync.dto.response.MonthlyReportResponse;
 import com.posdb.sync.service.DashboardService;
 import io.smallrye.common.constraint.NotNull;
 import jakarta.annotation.security.RolesAllowed;
@@ -63,20 +64,20 @@ public class DashboardResource {
                 .build();
     }
 
-//    @GET
-//    @Path("/orders")
-//    @RolesAllowed({"OWNER", "MANAGER"})
-//    public Response getOrders(
-//            @QueryParam("from") String fromDate,
-//            @QueryParam("to") String toDate,
-//            @QueryParam("limit") @DefaultValue("100") Integer limit,
-//            @QueryParam("offset") @DefaultValue("0") Integer offset) {
-//        try {
-//            String restaurantId = securityIdentity.getPrincipal().getName();
-//            log.info("Orders list requested for restaurantId: {}, from: {}, to: {}, limit: {}, offset: {}",
-//                    restaurantId, fromDate, toDate, limit, offset);
-//        }
-//    }
+    @GET
+    @Path("/monthly-report")
+    @RolesAllowed({"OWNER", "MANAGER"})
+    public Response getMonthlyReport(
+            @QueryParam("restaurant") String restaurantId,
+            @NotNull @QueryParam("month") String month) {
+        log.info("DashboardResource:: Monthly report requested for restaurantId: {}, month: {}",
+                restaurantId, month);
+        MonthlyReportResponse reportResponse = dashboardService.getMonthlyReport(restaurantId, month);
+        return Response.ok()
+                .entity(new ApiResponse<>(200, reportResponse, null))
+                .build();
+    }
+
 
 }
 
