@@ -1,15 +1,13 @@
 package com.posdb.sync.service;
 
-import com.posdb.sync.dto.response.DailyOrderResponse;
-import com.posdb.sync.dto.response.DashboardResponse;
-import com.posdb.sync.dto.response.OrderTypeInfo;
-import com.posdb.sync.dto.response.RestaurantInfo;
+import com.posdb.sync.dto.response.*;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
 import com.posdb.sync.entity.enums.OrderTypeEnum;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.repository.DashboardRepository;
 import com.posdb.sync.repository.dto.DashboardDataDto;
+import com.posdb.sync.repository.dto.DetailedReportDataDto;
 import com.posdb.sync.utils.BusinessWindowUtil;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -286,7 +284,7 @@ public class DashboardService {
             response.setDayOfWeek(selectedDate.getDayOfWeek().name());
             response.setStartDateTime(businessWindow.start().toString());
             response.setEndDateTime(businessWindow.end().toString());
-            response.setTotalOrders(dashboardData.size());
+            response.setTotalOrders((int) dashboardData.stream().map(DashboardDataDto::getOrderId).distinct().count());
             response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
                     .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
             response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
@@ -315,4 +313,99 @@ public class DashboardService {
             throw new AppException("Failed to generate dashboard data", Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @Transactional
+    public DailyDetailedReportResponse getDailyDetailedReport(String restaurantId, LocalDate selectedDate) {
+        try {
+            String userEmail = securityIdentity.getPrincipal().getName();
+            log.info("Daily detailed report requested for user: {} for date: {}", userEmail, selectedDate);
+
+            User user = User.<User>find("email = ?1", userEmail)
+                    .firstResultOptional().orElse(null);
+            if (user == null) {
+                log.warn("User not found for daily detailed report request: {}", userEmail);
+                throw new AppException("User not found", Response.Status.BAD_REQUEST);
+            }
+
+            DashboardResponse tempResponse = new DashboardResponse();
+            Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
+            if (selectedRestaurant == null) {
+                log.warn("No restaurant selected for daily detailed report request for user: {}", userEmail);
+                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+            }
+            UUID restaurantUuid = selectedRestaurant.getId();
+
+            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getYesterdayWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
+                    selectedDate, selectedRestaurant.getTimeZone());
+
+            List<DetailedReportDataDto> queryData = dashboardRepository.getDailyDetailedReportData(
+                    restaurantUuid, businessWindow.start(), businessWindow.end());
+            DailyDetailedReportResponse response = new DailyDetailedReportResponse();
+
+            // Group data by orderId to build order details
+            Map<Integer, List<DetailedReportDataDto>> orderMap = queryData.stream()
+                    .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
+
+            response.setTotalOrders((int) queryData.stream().map(DetailedReportDataDto::getOrderId).distinct().count());
+
+            List<DetailedReportDataDto> distinctEntries = queryData.stream().filter(d -> d.getOrderPaymentId() != null)
+                    .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
+                            (existing, replacement) -> existing // If ID matches, keep the first one found
+            )).values().stream().toList();
+            response.setTotalRevenue(distinctEntries.stream()
+                    .filter(d -> d.getAmountPaid() != null)
+                    .mapToDouble(d -> d.getAmountPaid().doubleValue())
+                    .sum());
+            List<OrderDetailDto> orderDetails = new ArrayList<>();
+            for(Map.Entry<Integer, List<DetailedReportDataDto>> entry : orderMap.entrySet()) {
+                log.info("Order ID: {}, number of items: {}", entry.getKey(), entry.getValue().size());
+                OrderDetailDto orderDetail = new OrderDetailDto();
+                orderDetail.setOrderNumber(entry.getKey());
+                if(entry.getValue().get(0) != null) {
+                    Map<Integer, DetailedReportDataDto> distinctPayments = entry.getValue().stream().filter(d -> d.getOrderPaymentId() != null)
+                            .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
+                                    (existing, replacement) -> existing));
+
+                    orderDetail.setOrderTime(entry.getValue().get(0).getOrderDateTime());
+                    orderDetail.setTotalAmount(distinctPayments.values().stream()
+                            .filter(d -> d.getAmountPaid() != null)
+                            .mapToDouble(d -> d.getAmountPaid().doubleValue())
+                            .sum());
+                    orderDetail.setPaymentMode(distinctPayments.values().stream()
+                            .filter(d -> d.getPaymentMethod() != null)
+                            .map(DetailedReportDataDto::getPaymentMethod)
+                            .distinct()
+                            .collect(Collectors.joining(", ")));
+                    orderDetail.setGuests(entry.getValue().get(0).getGuestNumber());
+                    orderDetail.setOrderType(entry.getValue().get(0).getOrderType() != null ? entry.getValue().get(0).getOrderType().name() : "UNKNOWN");
+                }
+                Map<Integer, DetailedReportDataDto> distinctTransactions = entry.getValue().stream().filter(d -> d.getOrderTransactionId() != null)
+                        .collect(Collectors.toMap(DetailedReportDataDto::getOrderTransactionId, d -> d,
+                                (existing, replacement) -> existing));
+                List<OrderItemDetailDto> orderItems = new ArrayList<>();
+                for (DetailedReportDataDto itemRow : distinctTransactions.values()) {
+                        OrderItemDetailDto item = new OrderItemDetailDto();
+                        item.setOrderItemName(itemRow.getMenuItemText() != null ? itemRow.getMenuItemText() : " - ");
+                        item.setQuantity(itemRow.getQuantity());
+                        item.setPrice(itemRow.getExtendedPrice());
+                        item.setDiscountGiven(itemRow.getDiscountAmount());
+                        orderItems.add(item);
+                }
+                orderDetail.setOrderItems(orderItems);
+                orderDetails.add(orderDetail);
+            }
+            response.setOrderList(orderDetails);
+
+            log.info("Daily detailed report generated successfully for restaurantId: {} for startTime: {} endTime:{} with {} orders",
+                    restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
+            return response;
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error generating daily detailed report", e);
+            throw new AppException("Failed to generate daily detailed report", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 }

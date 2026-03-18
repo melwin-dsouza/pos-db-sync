@@ -2,6 +2,7 @@ package com.posdb.sync.repository;
 
 import com.posdb.sync.entity.OrderHeader;
 import com.posdb.sync.repository.dto.DashboardDataDto;
+import com.posdb.sync.repository.dto.DetailedReportDataDto;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -23,6 +24,28 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                         " WHERE oh.restaurant.id = :restaurantId " +
                         " AND oh.orderDateTime >= :startDate " +
                         " AND oh.orderDateTime <= :endDate", DashboardDataDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
+    public List<DetailedReportDataDto> getDailyDetailedReportData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        // Fetch order headers with their payments and transactions
+        return getEntityManager()
+                .createQuery("SELECT new com.posdb.sync.repository.dto.DetailedReportDataDto(" +
+                " oh.orderId, oh.orderDateTime, oh.orderType, oh.guestNumber, " +
+                " op.orderPaymentId, op.paymentMethod, op.amountPaid, " +
+                " ot.orderTransactionId, ot.menuItemId, ot.quantity, ot.extendedPrice, ot.discountAmount, " +
+                " mi.menuItemText) " +
+                " FROM OrderHeader oh " +
+                " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId AND op.restaurant.id = :restaurantId " +
+                " LEFT JOIN OrderTransaction ot ON ot.orderId = oh.orderId AND ot.restaurant.id = :restaurantId " +
+                " LEFT JOIN MenuItem mi ON mi.menuItemId = ot.menuItemId AND mi.restaurant.id = :restaurantId " +
+                " WHERE oh.restaurant.id = :restaurantId " +
+                " AND oh.orderDateTime >= :startDate " +
+                " AND oh.orderDateTime <= :endDate " +
+                " ORDER BY oh.orderId, ot.orderTransactionId", DetailedReportDataDto.class)
                 .setParameter("restaurantId", restaurantId)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)

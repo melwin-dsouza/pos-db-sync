@@ -1,6 +1,7 @@
 package com.posdb.sync.resource;
 
 import com.posdb.sync.dto.response.ApiResponse;
+import com.posdb.sync.dto.response.DailyDetailedReportResponse;
 import com.posdb.sync.dto.response.DashboardResponse;
 import com.posdb.sync.service.DashboardService;
 import io.smallrye.common.constraint.NotNull;
@@ -45,6 +46,20 @@ public class DashboardResource {
         DashboardResponse dashboardResponse=  dashboardService.getDashboardDataByDate(restaurantId, selectedDate);
         return Response.status(Response.Status.CREATED)
                 .entity(new ApiResponse<>(200, dashboardResponse, null))
+                .build();
+    }
+
+    @GET
+    @Path("/daily-detailed-report")
+    @RolesAllowed({"OWNER", "MANAGER"})
+    public Response getDailyDetailedReport(
+            @QueryParam("restaurant") String restaurantId,
+            @NotNull @QueryParam("selectedDate") LocalDate selectedDate) {
+        log.info("DashboardResource:: Daily detailed report requested for restaurantId: {}, selectedDate: {}",
+                restaurantId, selectedDate);
+        DailyDetailedReportResponse reportResponse = dashboardService.getDailyDetailedReport(restaurantId, selectedDate);
+        return Response.ok()
+                .entity(new ApiResponse<>(200, reportResponse, null))
                 .build();
     }
 
