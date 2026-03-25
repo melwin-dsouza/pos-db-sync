@@ -350,12 +350,11 @@ public class DashboardService {
             Map<Integer, List<DetailedReportDataDto>> orderMap = queryData.stream()
                     .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
 
-            response.setTotalOrders((int) queryData.stream().map(DetailedReportDataDto::getOrderId).distinct().count());
-
             List<DetailedReportDataDto> distinctEntries = queryData.stream().filter(d -> d.getOrderPaymentId() != null)
                     .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
                             (existing, replacement) -> existing // If ID matches, keep the first one found
             )).values().stream().toList();
+
             response.setTotalRevenue(distinctEntries.stream()
                     .filter(d -> d.getAmountPaid() != null)
                     .mapToDouble(d -> d.getAmountPaid().doubleValue())
@@ -369,7 +368,7 @@ public class DashboardService {
                     Map<Integer, DetailedReportDataDto> distinctPayments = entry.getValue().stream().filter(d -> d.getOrderPaymentId() != null)
                             .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
                                     (existing, replacement) -> existing));
-
+                    log.info("distinctPayments for Order ID {}: {}", entry.getKey(), distinctPayments.size());
                     orderDetail.setOrderTime(entry.getValue().get(0).getOrderDateTime());
                     orderDetail.setTotalAmount(distinctPayments.values().stream()
                             .filter(d -> d.getAmountPaid() != null)
@@ -396,9 +395,14 @@ public class DashboardService {
                         orderItems.add(item);
                 }
                 orderDetail.setOrderItems(orderItems);
-                orderDetails.add(orderDetail);
+                if(orderDetail.getTotalAmount() == null || orderDetail.getTotalAmount() == 0) {
+                    log.warn("Order ID {} has no payment records, skipping order detail", entry.getKey());
+                }else {
+                    orderDetails.add(orderDetail);
+                }
             }
             response.setOrderList(orderDetails);
+            response.setTotalOrders(orderDetails.size());
 
             log.info("Daily detailed report generated successfully for restaurantId: {} for startTime: {} endTime:{} with {} orders",
                     restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
