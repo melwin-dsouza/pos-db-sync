@@ -12,7 +12,10 @@ import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 import static com.posdb.sync.dto.constants.AppConstants.API_KEY;
@@ -85,6 +88,20 @@ public class BasicAuthFilter implements ContainerRequestFilter {
             }
 
             LOGGER.info("POS endpoint accessed: {}", path);
+            // Log the request body as JSON
+            try {
+                InputStream is = requestContext.getEntityStream();
+                String requestBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                // Minify JSON by removing extra whitespace
+                String minifiedBody = requestBody.replaceAll("\\s+", "");
+
+                LOGGER.info("POS endpoint request body: {}", minifiedBody);
+                // Reset stream for downstream processing
+                requestContext.setEntityStream(new ByteArrayInputStream(requestBody.getBytes(StandardCharsets.UTF_8)));
+            } catch (IOException e) {
+                LOGGER.warn("Error reading request body", e);
+            }
+
         }
     }
 }

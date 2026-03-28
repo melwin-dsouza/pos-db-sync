@@ -30,7 +30,7 @@ public class OrderSyncResource {
     @POST
     @Path("/orderheaders/sync")
     public Response syncOrderHeaders(OrderHeaderSyncRequest request, @Context HttpHeaders headers) {
-        log.info("OrderSyncResource:: Received Sync ORDER_HEADERS request: {}", request);
+        log.info("OrderSyncResource:: Received Sync ORDER_HEADERS request: {}", request.getOrderHeaders().size());
         String apiKey = headers.getHeaderString(API_KEY);
         if(apiKey == null || apiKey.isEmpty()) {
             log.warn("OrderSyncResource:: Missing API Key in headers");
@@ -47,7 +47,7 @@ public class OrderSyncResource {
     @POST
     @Path("/orderpayments/sync")
     public Response syncOrderPayments(OrderPaymentSyncRequest request, @Context HttpHeaders headers) {
-        log.info("OrderSyncResource:: Received Sync ORDER_PAYMENTS request: {}", request);
+        log.info("OrderSyncResource:: Received Sync ORDER_PAYMENTS request: {}", request.getOrderPayments().size());
         SyncResponse syncResponse = orderSyncService.syncOrderPayments(request, headers);
         return Response.status(Response.Status.OK)
                 .entity(new ApiResponse<>(200, syncResponse, null))
@@ -57,7 +57,7 @@ public class OrderSyncResource {
     @POST
     @Path("/ordertransactions/sync")
     public Response syncOrderTransactions(OrderTransactionSyncRequest request, @Context HttpHeaders headers) {
-        log.info("OrderSyncResource:: Received Sync ORDER_TRANSACTIONS request: {}", request);
+        log.info("OrderSyncResource:: Received Sync ORDER_TRANSACTIONS request: {}", request.getOrderTransactions().size());
         SyncResponse syncResponse = orderSyncService.syncOrderTransactions(request, headers);
         return Response.status(Response.Status.OK)
                 .entity(new ApiResponse<>(200, syncResponse, null))
