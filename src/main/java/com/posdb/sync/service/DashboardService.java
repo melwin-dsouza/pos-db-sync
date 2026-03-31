@@ -9,6 +9,7 @@ import com.posdb.sync.repository.DashboardRepository;
 import com.posdb.sync.repository.dto.DashboardDataDto;
 import com.posdb.sync.repository.dto.DetailedReportDataDto;
 import com.posdb.sync.repository.dto.MonthlyReportDataDto;
+import com.posdb.sync.repository.dto.DailyChartDataDto;
 import com.posdb.sync.utils.BusinessWindowUtil;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -290,8 +291,7 @@ public class DashboardService {
             response.setTotalOrders((int) dashboardData.stream().map(DashboardDataDto::getOrderId).distinct().count());
             response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
                     .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
-            response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
-                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).average().orElse(0));
+            response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
             response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
             response.setTotalDiscounts(dashboardData.stream().filter(d -> d.getDiscountAmount() != null)
                     .mapToDouble(d -> d.getDiscountAmount().doubleValue()).sum());
@@ -301,7 +301,7 @@ public class DashboardService {
                     .collect(Collectors.groupingBy(DashboardDataDto::getOrderType));
             for (Map.Entry<OrderTypeEnum, List<DashboardDataDto>> entry : typeListMap.entrySet()) {
                 log.info("Order type: {} ., count: {} .", entry.getKey(), entry.getValue().size());
-                orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), entry.getValue().size(),
+                orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), (int) entry.getValue().stream().map(DashboardDataDto::getOrderId).distinct().count(),
                         entry.getValue().stream().filter(d -> d.getAmountPaid() != null)
                                 .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
             }
@@ -496,6 +496,78 @@ public class DashboardService {
         } catch (Exception e) {
             log.error("Error generating monthly report", e);
             throw new AppException("Failed to generate monthly report", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public DailyChartDataResponse getDailyChartDataForMonth(String restaurantId, String monthStr) {
+        try {
+            String userEmail = securityIdentity.getPrincipal().getName();
+            log.info("Daily chart data requested for user: {} for month: {}", userEmail, monthStr);
+
+            User user = User.<User>find("email = ?1", userEmail)
+                    .firstResultOptional().orElse(null);
+            if (user == null) {
+                log.warn("User not found for daily chart data request: {}", userEmail);
+                throw new AppException("User not found", Response.Status.BAD_REQUEST);
+            }
+
+            DashboardResponse tempResponse = new DashboardResponse();
+            Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
+            if (selectedRestaurant == null) {
+                log.warn("No restaurant selected for daily chart data request for user: {}", userEmail);
+                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+            }
+            UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Parse month string (expected format: YYYY-MM)
+            YearMonth yearMonth = YearMonth.parse(monthStr);
+            LocalDate monthStart = yearMonth.atDay(1);
+            LocalDate monthEnd = yearMonth.atEndOfMonth();
+
+            // Get business windows for month start and end
+            BusinessWindowUtil.BusinessWindow startWindow = BusinessWindowUtil.getBusinessWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
+                    monthStart, selectedRestaurant.getTimeZone());
+
+            BusinessWindowUtil.BusinessWindow endWindow = BusinessWindowUtil.getBusinessWindow(
+                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
+                    monthEnd, selectedRestaurant.getTimeZone());
+
+            OffsetDateTime monthStartDateTime = startWindow.start();
+            OffsetDateTime monthEndDateTime = endWindow.end();
+
+            // Fetch daily chart data grouped by date
+            List<DailyChartDataDto> dailyData = dashboardRepository.getDailyChartData(
+                    restaurantUuid, monthStartDateTime, monthEndDateTime);
+
+            // Build response with day-by-day data
+            DailyChartDataResponse response = new DailyChartDataResponse();
+            response.setMonthName(yearMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+            response.setMonthStartDate(monthStart);
+            response.setMonthEndDate(monthEnd);
+
+            List<DailyChartDataResponse.DailyChartData> chartDataList = new ArrayList<>();
+            for (DailyChartDataDto item : dailyData) {
+                DailyChartDataResponse.DailyChartData chartData = new DailyChartDataResponse.DailyChartData();
+                chartData.setDate(item.getDate());
+                chartData.setWeekday(item.getDate().getDayOfWeek().name());
+                chartData.setTotalOrders(item.getNumberOfOrders() != null ? item.getNumberOfOrders().intValue() : 0);
+                chartData.setTotalRevenue(item.getSumOfAmountPaid() != null ? item.getSumOfAmountPaid() : BigDecimal.ZERO);
+                chartDataList.add(chartData);
+            }
+
+            response.setDailyData(chartDataList);
+
+            log.info("Daily chart data generated successfully for restaurantId: {} for month: {} with {} days of data",
+                    restaurantId, monthStr, chartDataList.size());
+
+            return response;
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error generating daily chart data", e);
+            throw new AppException("Failed to generate daily chart data", Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
 

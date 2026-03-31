@@ -4,6 +4,7 @@ import com.posdb.sync.dto.response.ApiResponse;
 import com.posdb.sync.dto.response.DailyDetailedReportResponse;
 import com.posdb.sync.dto.response.DashboardResponse;
 import com.posdb.sync.dto.response.MonthlyReportResponse;
+import com.posdb.sync.dto.response.DailyChartDataResponse;
 import com.posdb.sync.service.DashboardService;
 import io.smallrye.common.constraint.NotNull;
 import jakarta.annotation.security.RolesAllowed;
@@ -78,6 +79,19 @@ public class DashboardResource {
                 .build();
     }
 
+    @GET
+    @Path("/daily-chart-data")
+    @RolesAllowed({"OWNER", "MANAGER"})
+    public Response getDailyChartData(
+            @QueryParam("restaurant") String restaurantId,
+            @NotNull @QueryParam("month") String month) {
+        log.info("DashboardResource:: Daily chart data requested for restaurantId: {}, month: {}",
+                restaurantId, month);
+        DailyChartDataResponse chartResponse = dashboardService.getDailyChartDataForMonth(restaurantId, month);
+        return Response.ok()
+                .entity(new ApiResponse<>(200, chartResponse, null))
+                .build();
+    }
 
 }
 

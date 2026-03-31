@@ -4,6 +4,7 @@ import com.posdb.sync.entity.OrderHeader;
 import com.posdb.sync.repository.dto.DashboardDataDto;
 import com.posdb.sync.repository.dto.DetailedReportDataDto;
 import com.posdb.sync.repository.dto.MonthlyReportDataDto;
+import com.posdb.sync.repository.dto.DailyChartDataDto;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -66,6 +67,25 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
 
         return getEntityManager()
                 .createQuery(query, MonthlyReportDataDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
+    public List<DailyChartDataDto> getDailyChartData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        String query = "SELECT new com.posdb.sync.repository.dto.DailyChartDataDto(" +
+                " CAST(oh.orderDateTime AS LocalDate), COUNT(DISTINCT oh.orderId), COALESCE(SUM(op.amountPaid), 0))" +
+                " FROM OrderHeader oh " +
+                " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
+                " WHERE oh.restaurant.id = :restaurantId " +
+                " AND oh.orderDateTime >= :startDate " +
+                " AND oh.orderDateTime <= :endDate " +
+                " GROUP BY CAST(oh.orderDateTime AS LocalDate) " +
+                " ORDER BY CAST(oh.orderDateTime AS LocalDate) ASC";
+
+        return getEntityManager()
+                .createQuery(query, DailyChartDataDto.class)
                 .setParameter("restaurantId", restaurantId)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)
