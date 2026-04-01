@@ -409,6 +409,7 @@ public class DashboardService {
                     orderDetails.add(orderDetail);
                 }
             }
+            orderDetails.sort(Comparator.comparing(OrderDetailDto::getOrderTime));
             response.setOrderList(orderDetails);
             response.setTotalOrders(orderDetails.size());
 
