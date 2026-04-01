@@ -1,10 +1,7 @@
 package com.posdb.sync.repository;
 
 import com.posdb.sync.entity.OrderHeader;
-import com.posdb.sync.repository.dto.DashboardDataDto;
-import com.posdb.sync.repository.dto.DetailedReportDataDto;
-import com.posdb.sync.repository.dto.MonthlyReportDataDto;
-import com.posdb.sync.repository.dto.DailyChartDataDto;
+import com.posdb.sync.repository.dto.*;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -15,6 +12,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class DashboardRepository implements PanacheRepository<OrderHeader> {
 
+    @Deprecated
     public List<DashboardDataDto> getDashboardData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
         // Use the built-in EntityManager for custom queries
         return getEntityManager()
@@ -24,6 +22,7 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                         " FROM OrderHeader oh " +
                         " JOIN OrderPayment op ON op.orderId = oh.orderId" +
                         " WHERE oh.restaurant.id = :restaurantId " +
+                        " AND op.restaurant.id = :restaurantId " +
                         " AND oh.orderDateTime >= :startDate " +
                         " AND oh.orderDateTime <= :endDate", DashboardDataDto.class)
                 .setParameter("restaurantId", restaurantId)
@@ -31,6 +30,28 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 .setParameter("endDate", endDate)
                 .getResultList();
     }
+
+
+    public List<DailyRevenueBreakdownDto> getDailyRevenueBreakdown(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        // Use the built-in EntityManager for custom queries
+        return getEntityManager()
+                .createQuery("SELECT NEW com.posdb.sync.repository.dto.DailyRevenueBreakdownDto(" +
+                        "COUNT(DISTINCT oh.orderId), COUNT(DISTINCT oh.guestNumber), SUM(op.amountPaid), " +
+                        "SUM(oh.discountAmount), oh.orderType, COUNT(DISTINCT oh.orderId), SUM(op.amountPaid)) " +
+                        "FROM OrderHeader oh " +
+                        "INNER JOIN OrderPayment op ON oh.orderId = op.orderId " +
+                        "WHERE oh.restaurant.id = :restaurantId " +
+                        "AND op.restaurant.id = :restaurantId " +
+                        "AND oh.orderDateTime >= :startDate " +
+                        "AND oh.orderDateTime <= :endDate " +
+                        "GROUP BY ROLLUP(oh.orderType) " +
+                        "ORDER BY oh.orderType", DailyRevenueBreakdownDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
 
     public List<DetailedReportDataDto> getDailyDetailedReportData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
         // Fetch order headers with their payments and transactions
@@ -44,7 +65,7 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId AND op.restaurant.id = :restaurantId " +
                 " LEFT JOIN OrderTransaction ot ON ot.orderId = oh.orderId AND ot.restaurant.id = :restaurantId " +
                 " LEFT JOIN MenuItem mi ON mi.menuItemId = ot.menuItemId AND mi.restaurant.id = :restaurantId " +
-                " WHERE oh.restaurant.id = :restaurantId " +
+                " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId AND ot.restaurant.id = :restaurantId " +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " ORDER BY oh.orderId, ot.orderTransactionId", DetailedReportDataDto.class)
@@ -59,7 +80,7 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 " oh.orderType, COUNT(DISTINCT oh.orderId), COALESCE(SUM(op.amountPaid), 0))" +
                 " FROM OrderHeader oh " +
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
-                " WHERE oh.restaurant.id = :restaurantId " +
+                " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId" +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " GROUP BY oh.orderType " +
@@ -78,7 +99,7 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 " CAST(oh.orderDateTime AS LocalDate), COUNT(DISTINCT oh.orderId), COALESCE(SUM(op.amountPaid), 0))" +
                 " FROM OrderHeader oh " +
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
-                " WHERE oh.restaurant.id = :restaurantId " +
+                " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId" +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " GROUP BY CAST(oh.orderDateTime AS LocalDate) " +

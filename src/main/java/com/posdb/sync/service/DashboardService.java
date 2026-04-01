@@ -6,10 +6,7 @@ import com.posdb.sync.entity.User;
 import com.posdb.sync.entity.enums.OrderTypeEnum;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.repository.DashboardRepository;
-import com.posdb.sync.repository.dto.DashboardDataDto;
-import com.posdb.sync.repository.dto.DetailedReportDataDto;
-import com.posdb.sync.repository.dto.MonthlyReportDataDto;
-import com.posdb.sync.repository.dto.DailyChartDataDto;
+import com.posdb.sync.repository.dto.*;
 import com.posdb.sync.utils.BusinessWindowUtil;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,6 +38,7 @@ public class DashboardService {
     @Inject
     DashboardRepository dashboardRepository;
 
+    @Deprecated
     @Transactional
     public DashboardResponse getDashboardData(String restaurantId) {
         try {
@@ -283,27 +281,37 @@ public class DashboardService {
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), selectedDate, selectedRestaurant.getTimeZone());
 
 
-            List<DashboardDataDto> dashboardData = dashboardRepository.getDashboardData(restaurantUuid, businessWindow.start(), businessWindow.end());
+            List<DailyRevenueBreakdownDto> dashboardData = dashboardRepository.getDailyRevenueBreakdown(restaurantUuid, businessWindow.start(), businessWindow.end());
             response.setDayTitle(selectedDate.toString());
             response.setDayOfWeek(selectedDate.getDayOfWeek().name());
             response.setStartDateTime(businessWindow.start().toString());
             response.setEndDateTime(businessWindow.end().toString());
-            response.setTotalOrders((int) dashboardData.stream().map(DashboardDataDto::getOrderId).distinct().count());
-            response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
-                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
-            response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
-            response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
-            response.setTotalDiscounts(dashboardData.stream().filter(d -> d.getDiscountAmount() != null)
-                    .mapToDouble(d -> d.getDiscountAmount().doubleValue()).sum());
+
+            // Get totals from the last row (where order_type is null - ROLLUP total row)
+            DailyRevenueBreakdownDto totalRow = dashboardData.stream()
+                    .filter(d -> d.getOrderType() == null)
+                    .findFirst()
+                    .orElse(null);
+
+            if (totalRow != null) {
+                response.setTotalOrders(totalRow.getTotalOrders() != null ? totalRow.getTotalOrders().intValue() : 0);
+                response.setNumberOfGuests(totalRow.getTotalGuests() != null ? totalRow.getTotalGuests().intValue() : 0);
+                response.setTotalRevenue(totalRow.getTotalRevenue() != null ? totalRow.getTotalRevenue().doubleValue() : 0);
+                response.setTotalDiscounts(totalRow.getTotalDiscounts() != null ? totalRow.getTotalDiscounts().doubleValue() : 0);
+                response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
+            }
+
+            // Build order type breakdown (exclude the null order_type row which is the grand total)
             List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
-            Map<OrderTypeEnum, List<DashboardDataDto>> typeListMap = dashboardData.stream()
+            List<DailyRevenueBreakdownDto> typeData = dashboardData.stream()
                     .filter(d -> d.getOrderType() != null)
-                    .collect(Collectors.groupingBy(DashboardDataDto::getOrderType));
-            for (Map.Entry<OrderTypeEnum, List<DashboardDataDto>> entry : typeListMap.entrySet()) {
-                log.info("Order type: {} ., count: {} .", entry.getKey(), entry.getValue().size());
-                orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), (int) entry.getValue().stream().map(DashboardDataDto::getOrderId).distinct().count(),
-                        entry.getValue().stream().filter(d -> d.getAmountPaid() != null)
-                                .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
+                    .toList();
+            for (DailyRevenueBreakdownDto dto : typeData) {
+                orderTypeInfoList.add(new OrderTypeInfo(
+                        dto.getOrderType(),
+                        dto.getOrdertypeOrderCount() != null ? dto.getOrdertypeOrderCount().intValue() : 0,
+                        dto.getOrdertypeRevenue() != null ? dto.getOrdertypeRevenue().doubleValue() : 0
+                ));
             }
             response.setOrderTypeInfoList(orderTypeInfoList);
             setRestaurantListInfo(user, response);
