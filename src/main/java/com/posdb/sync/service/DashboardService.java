@@ -413,6 +413,10 @@ public class DashboardService {
             response.setOrderList(orderDetails);
             response.setTotalOrders(orderDetails.size());
 
+            // Calculate hourly breakdown
+            List<HourlyReportDataDto> hourlyBreakdown = calculateHourlyBreakdown(queryData);
+            response.setHourlyBreakdown(hourlyBreakdown);
+
             log.info("Daily detailed report generated successfully for restaurantId: {} for startTime: {} endTime:{} with {} orders",
                     restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
             return response;
@@ -580,4 +584,77 @@ public class DashboardService {
         }
     }
 
+    /**
+     * Calculate hourly breakdown from detailed report data
+     * Groups orders by hour (0-23) and aggregates revenue, discounts, guests, and order count
+     */
+    private List<HourlyReportDataDto> calculateHourlyBreakdown(List<DetailedReportDataDto> queryData) {
+        log.debug("Calculating hourly breakdown for {} data records", queryData.size());
+
+        // Group by hour of day
+        Map<Integer, List<DetailedReportDataDto>> hourlyGroups = new TreeMap<>();
+
+        for (DetailedReportDataDto data : queryData) {
+            if (data.getOrderDateTime() != null) {
+                int hour = data.getOrderDateTime().getHour();
+                hourlyGroups.computeIfAbsent(hour, k -> new ArrayList<>()).add(data);
+            }
+        }
+
+        // Convert to HourlyReportDataDto
+        List<HourlyReportDataDto> hourlyBreakdown = new ArrayList<>();
+
+        for (Map.Entry<Integer, List<DetailedReportDataDto>> entry : hourlyGroups.entrySet()) {
+            int hour = entry.getKey();
+            List<DetailedReportDataDto> hourData = entry.getValue();
+
+            // Get distinct payments for this hour to avoid double counting
+            List<DetailedReportDataDto> distinctPayments = hourData.stream()
+                    .filter(d -> d.getOrderPaymentId() != null)
+                    .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
+                            (existing, replacement) -> existing))
+                    .values().stream().toList();
+
+            // Get distinct orders for this hour
+            int orderCount = (int) hourData.stream()
+                    .map(DetailedReportDataDto::getOrderId)
+                    .distinct()
+                    .count();
+
+            // Calculate total revenue for this hour
+            BigDecimal totalRevenue = distinctPayments.stream()
+                    .filter(d -> d.getAmountPaid() != null)
+                    .map(DetailedReportDataDto::getAmountPaid)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Calculate total discounts for this hour
+            BigDecimal totalDiscounts = hourData.stream()
+                    .filter(d -> d.getDiscountAmount() != null)
+                    .map(DetailedReportDataDto::getDiscountAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Calculate total guests for this hour
+            int totalGuests = hourData.stream()
+                    .filter(d -> d.getGuestNumber() != null)
+                    .mapToInt(DetailedReportDataDto::getGuestNumber)
+                    .sum();
+
+            HourlyReportDataDto hourlyDto = new HourlyReportDataDto();
+            hourlyDto.setHour(hour);
+            hourlyDto.setOrderCount(orderCount);
+            hourlyDto.setTotalRevenue(totalRevenue);
+            hourlyDto.setTotalDiscounts(totalDiscounts);
+            hourlyDto.setTotalGuests(totalGuests);
+
+            hourlyBreakdown.add(hourlyDto);
+
+            log.debug("Hour {}: {} orders, Revenue: {}, Discounts: {}, Guests: {}",
+                    hour, orderCount, totalRevenue, totalDiscounts, totalGuests);
+        }
+
+        return hourlyBreakdown;
+    }
+
 }
+
+
