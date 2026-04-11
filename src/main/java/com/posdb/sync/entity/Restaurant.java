@@ -20,7 +20,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString(exclude = {"apiKey", "userList"})
+@ToString(exclude = {"apiKey", "userRestaurants"})
 public class Restaurant extends PanacheEntityBase {
 
     @Id

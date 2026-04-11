@@ -5,6 +5,8 @@ import com.posdb.sync.dto.request.CreateRestaurantRequest;
 import com.posdb.sync.dto.response.CreateRestaurantResponse;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
+import com.posdb.sync.entity.UserRestaurant;
+import com.posdb.sync.entity.enums.SubscriptionTypeEnum;
 import com.posdb.sync.entity.enums.UserRole;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.utils.PasswordUtil;
@@ -15,6 +17,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -82,7 +85,16 @@ public class AdminService {
             String passwordHash = passwordUtil.hashPassword(generatedPassword);
 
             User user = new User();
-            user.getRestaurants().add(restaurant);
+
+            UserRestaurant userRestaurant = new UserRestaurant();
+            userRestaurant.setUser(user);
+            userRestaurant.setRestaurant(restaurant);
+            userRestaurant.setSubscriptionType(SubscriptionTypeEnum.MONTHLY);
+            userRestaurant.setSubscriptionStartDate(LocalDateTime.now());
+            userRestaurant.setSubscriptionExpiryDate(LocalDateTime.now().plusMonths(1)); // 1 month trial
+            userRestaurant.setIsSubscriptionActive(true);
+
+            user.getUserRestaurants().add(userRestaurant);
             user.setPrimaryRestaurant(restaurant);
             user.setEmail(request.getEmail());
             user.setMobileNumber(request.getMobileNumber());
