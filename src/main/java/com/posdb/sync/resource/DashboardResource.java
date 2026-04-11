@@ -30,17 +30,6 @@ public class DashboardResource {
     DashboardService dashboardService;
 
     @GET
-    @Path("/")
-    @RolesAllowed({"OWNER", "MANAGER"})
-    public Response getDashboardData(@QueryParam("restaurant") String restaurantId) {
-        log.info("DashboardResource:: Dashboard data requested for restaurantId: {}", restaurantId);
-        DashboardResponse dashboardResponse=  dashboardService.getDashboardData(restaurantId);
-        return Response.status(Response.Status.CREATED)
-                .entity(new ApiResponse<>(200, dashboardResponse, null))
-                .build();
-    }
-
-    @GET
     @Path("/by-date")
     @RolesAllowed({"OWNER", "MANAGER"})
     public Response getDashboardDataByDate(@QueryParam("restaurant") String restaurantId, @NotNull @QueryParam("selectedDate")  LocalDate selectedDate) {

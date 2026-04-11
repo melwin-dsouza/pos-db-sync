@@ -37,7 +37,11 @@ public class MenuItemSyncService {
     public SyncResponse syncMenuItems(MenuItemSyncRequest request, HttpHeaders headers) {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
-            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
+
+            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantWithSubscription(apiKey);
+            log.info("MenuItemSyncService::syncMenuItems Subscription validation passed for  restaurant: {}", restaurant.getName());
+
+
             StringBuilder failureMessage = new StringBuilder("\n........RestaurantName: " + restaurant.getName() + ".......\n.........MENU_ITEMS........\n ");
 
             log.info("MenuItemSyncService::syncMenuItems Validated API Key for restaurant: {} with records:{}",
@@ -124,7 +128,9 @@ public class MenuItemSyncService {
     public SyncResponse fullSyncMenuItems(MenuItemSyncRequest request, HttpHeaders headers) {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
-            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
+            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantWithSubscription(apiKey);
+            log.info("MenuItemSyncService::fullSyncMenuItems Subscription validation passed for  restaurant: {}", restaurant.getName());
+
             StringBuilder failureMessage = new StringBuilder("\n........RestaurantName: " + restaurant.getName() + ".......\n.........MENU_ITEMS_FULL_SYNC........\n ");
 
             log.info("MenuItemSyncService::fullSyncMenuItems Full sync request received for restaurant: {} with records:{}",

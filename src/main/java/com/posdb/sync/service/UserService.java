@@ -1,10 +1,11 @@
 package com.posdb.sync.service;
 
 import com.posdb.sync.dto.request.ChangePasswordRequest;
-import com.posdb.sync.dto.response.RestaurantInfo;
+import com.posdb.sync.dto.response.RestaurantSubscriptionInfo;
 import com.posdb.sync.dto.response.UserInfoResponse;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
+import com.posdb.sync.entity.UserRestaurant;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.utils.PasswordUtil;
 import com.posdb.sync.utils.TextUtil;
@@ -16,6 +17,7 @@ import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @ApplicationScoped
@@ -30,6 +32,9 @@ public class UserService {
 
     @Inject
     PasswordUtil passwordUtil;
+
+    @Inject
+    SubscriptionService subscriptionService;
 
     @Transactional
     public void changePassword(ChangePasswordRequest request) {
@@ -75,14 +80,32 @@ public class UserService {
             log.warn("User not found for Get User Info request : {}", userEmail);
             throw new AppException("User not found", Response.Status.BAD_REQUEST);
         }
-        RestaurantInfo primaryRestaurantInfo = null;
+        // Build primary restaurant info with subscription details
+        RestaurantSubscriptionInfo primaryRestaurantInfo = null;
         if (user.getPrimaryRestaurant() != null) {
             Restaurant restaurant = user.getPrimaryRestaurant();
-            primaryRestaurantInfo = new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress());
+            primaryRestaurantInfo = buildRestaurantSubscriptionInfo(user, restaurant);
         }
-        List<RestaurantInfo> restaurantInfos = user.getRestaurants().stream()
-                .map(r -> new RestaurantInfo(r.getId().toString(), r.getName(), r.getAddress()))
-                .toList();
+
+        // Build associated restaurants list with subscription details using userRestaurants
+        List<RestaurantSubscriptionInfo> restaurantInfos = new ArrayList<>();
+        if (user.getUserRestaurants() != null) {
+            for (UserRestaurant userRestaurant : user.getUserRestaurants()) {
+                Restaurant restaurant = userRestaurant.getRestaurant();
+
+                RestaurantSubscriptionInfo restaurantInfo = new RestaurantSubscriptionInfo(
+                    restaurant.getId().toString(),
+                    restaurant.getName(),
+                    restaurant.getAddress(),
+                    userRestaurant.getSubscriptionType(),
+                    userRestaurant.getSubscriptionStartDate(),
+                    userRestaurant.getSubscriptionExpiryDate(),
+                    userRestaurant.isSubscriptionCurrentlyValid()
+                );
+                restaurantInfos.add(restaurantInfo);
+            }
+        }
+
         UserInfoResponse userInfoResponse = new UserInfoResponse(
                 user.getFullName(),
                 user.getEmail(),
@@ -90,8 +113,25 @@ public class UserService {
                 primaryRestaurantInfo,
                 restaurantInfos
         );
-        log.info("Fetched User info successfully for userId: {}", userEmail);
+        log.info("Fetched User info with subscription details successfully for userId: {}", userEmail);
         return userInfoResponse;
+    }
 
+    private RestaurantSubscriptionInfo buildRestaurantSubscriptionInfo(User user, Restaurant restaurant) {
+        UserRestaurant userRestaurant = subscriptionService.getUserRestaurant(user.getId(), restaurant.getId());
+        if(userRestaurant == null) {
+            log.warn("No subscription info found for userId: {} and restaurantId: {}", user.getId(), restaurant.getId());
+            return new RestaurantSubscriptionInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress(),
+                    null, null, null, false);
+        }
+        return new RestaurantSubscriptionInfo(
+                restaurant.getId().toString(),
+                restaurant.getName(),
+                restaurant.getAddress(),
+                userRestaurant.getSubscriptionType(),
+                userRestaurant.getSubscriptionStartDate(),
+                userRestaurant.getSubscriptionExpiryDate(),
+                userRestaurant.isSubscriptionCurrentlyValid()
+            );
     }
 }

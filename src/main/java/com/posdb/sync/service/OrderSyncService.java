@@ -34,7 +34,10 @@ public class OrderSyncService {
     public SyncResponse syncOrderHeaders(OrderHeaderSyncRequest request, HttpHeaders headers) {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
-            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
+
+            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantWithSubscription(apiKey);
+            log.info("OrderSyncService::syncOrderHeaders Subscription validation passed for  restaurant: {}", restaurant.getName());
+
             StringBuilder failureMessage = new StringBuilder("\n........RestaurantName: " + restaurant.getName() + ".......\n.........ORDER_HEADERS........\n ");
 
             log.info("OrderSyncService:: Order header sync request received for restaurantId: {} with {} records",
@@ -126,7 +129,9 @@ public class OrderSyncService {
     public SyncResponse syncOrderPayments(OrderPaymentSyncRequest request, @Context HttpHeaders headers) {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
-            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
+            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantWithSubscription(apiKey);
+            log.info("OrderSyncService::syncOrderPayments Subscription validation passed for  restaurant: {}", restaurant.getName());
+
             StringBuilder failureMessage = new StringBuilder("........RestaurantName: " + restaurant.getName() + ".......\n .........ORDER_PAYMENTS........\n ");
 
             log.info("OrderSyncService:: Order payment sync request received for restaurantId: {} with {} records",
@@ -205,7 +210,10 @@ public class OrderSyncService {
     public SyncResponse syncOrderTransactions(OrderTransactionSyncRequest request, @Context HttpHeaders headers) {
         try {
             String apiKey = headers.getHeaderString(API_KEY);
-            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantId(apiKey);
+
+            Restaurant restaurant = apiKeyValidatorService.validateAndGetRestaurantWithSubscription(apiKey);
+            log.info("OrderSyncService::syncOrderTransactions Subscription validation passed for  restaurant: {}", restaurant.getName());
+
             StringBuilder failureMessage = new StringBuilder("........RestaurantName: " + restaurant.getName() + ".......\n .........ORDER_TRANSACTIONS........\n ");
 
             log.info("OrderSyncService:: Order transaction sync request received for restaurantId: {} with {} records",

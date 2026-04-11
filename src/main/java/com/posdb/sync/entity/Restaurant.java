@@ -48,8 +48,11 @@ public class Restaurant extends PanacheEntityBase {
     @Column(name= "status")
     private String status;
 
-    @ManyToMany(mappedBy = "restaurants")
-    private List<User> userList = new ArrayList<>();
+//    @ManyToMany(mappedBy = "restaurants")
+//    private List<User> userList = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
+    private List<UserRestaurant> userRestaurants = new ArrayList<>();
 
     @Column(name = "last_sync_time")
     private OffsetDateTime lastSyncTime;
@@ -74,6 +77,16 @@ public class Restaurant extends PanacheEntityBase {
     @PrePersist
     public void prePersist() {
         this.status = "ACTIVE";
+    }
+
+    // Helper method for backward compatibility
+    public List<User> getUsers() {
+        if (userRestaurants == null) {
+            return new ArrayList<>();
+        }
+        return userRestaurants.stream()
+                .map(UserRestaurant::getUser)
+                .collect(java.util.stream.Collectors.toList());
     }
 
 }

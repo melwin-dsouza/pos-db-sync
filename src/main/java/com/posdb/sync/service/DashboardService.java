@@ -3,7 +3,6 @@ package com.posdb.sync.service;
 import com.posdb.sync.dto.response.*;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
-import com.posdb.sync.entity.enums.OrderTypeEnum;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.repository.DashboardRepository;
 import com.posdb.sync.repository.dto.*;
@@ -38,244 +37,27 @@ public class DashboardService {
     @Inject
     DashboardRepository dashboardRepository;
 
-    @Deprecated
-    @Transactional
-    public DashboardResponse getDashboardData(String restaurantId) {
-        try {
-            String userEmail = securityIdentity.getPrincipal().getName();
-            log.info("Dashboard data report requested for user: {}", userEmail);
-            User user = User.<User>find("email = ?1", userEmail)
-                    .firstResultOptional().orElse(null);
-            if (user == null) {
-                log.warn("User not found for Get DashboardData request : {}", userEmail);
-                throw new AppException("User not found", Response.Status.BAD_REQUEST);
-            }
-
-            DashboardResponse response = new DashboardResponse();
-
-            Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, response);
-            if(selectedRestaurant == null) {
-                log.warn("No restaurant selected for DashboardData request for user: {}", userEmail);
-                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
-            }
-            UUID restaurantUuid = selectedRestaurant.getId();
-
-            LocalDate yesterday = LocalDate.now().minusDays(1); // Get yesterday's date
-            BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
-                    selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), yesterday, selectedRestaurant.getTimeZone());
-
-
-            List<DashboardDataDto> dashboardData = dashboardRepository.getDashboardData(restaurantUuid, businessWindow.start(), businessWindow.end());
-            response.setDayTitle("Yesterday");
-            response.setDayOfWeek(yesterday.getDayOfWeek().name());
-            response.setStartDateTime(businessWindow.start().toString());
-            response.setEndDateTime(businessWindow.end().toString());
-            response.setTotalOrders(dashboardData.size());
-            response.setTotalRevenue(dashboardData.stream().filter(d -> d.getAmountPaid() != null)
-                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).sum());
-            response.setAverageOrderValue(dashboardData.isEmpty() ? 0 : dashboardData.stream().filter(d -> d.getAmountPaid() != null)
-                    .mapToDouble(d -> d.getAmountPaid().doubleValue()).average().orElse(0));
-            response.setNumberOfGuests(dashboardData.stream().filter(d -> d.getGuestNumber() != null).mapToInt(DashboardDataDto::getGuestNumber).sum());
-
-            List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
-            Map<OrderTypeEnum, List<DashboardDataDto>> typeListMap = dashboardData.stream()
-                    .filter(d -> d.getOrderType() != null)
-                    .collect(Collectors.groupingBy(DashboardDataDto::getOrderType));
-            for (Map.Entry<OrderTypeEnum, List<DashboardDataDto>> entry : typeListMap.entrySet()) {
-                log.info("Order type: {}, count: {}", entry.getKey(), entry.getValue().size());
-                orderTypeInfoList.add(new OrderTypeInfo(entry.getKey(), entry.getValue().size(),
-                        entry.getValue().stream().filter(d -> d.getAmountPaid() != null).mapToDouble(d -> d.getAmountPaid().doubleValue()).sum()));
-            }
-            response.setOrderTypeInfoList(orderTypeInfoList);
-            setRestaurantListInfo(user, response);
-            log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders",
-                    restaurantId, response.getStartDateTime(), response.getTotalOrders());
-
-
-            return response;
-        } catch (Exception e) {
-            log.error("Error generating daily orders report", e);
-            throw new AppException("Failed to generate dashboard data", Response.Status.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private Restaurant extractSelectedRestaurant(String restaurantId, String userEmail, User user, DashboardResponse response) {
-        if ("ALL".equalsIgnoreCase(restaurantId)) {
-            log.info("ALL restaurantId provided for user: {}", userEmail);
-            throw new AppException("ALL restaurantId is not supported for DashboardData request", Response.Status.BAD_REQUEST);
-        } else if (restaurantId == null || restaurantId.isEmpty()) {
-            log.warn("Missing restaurantId parameter for DashboardData request");
-            log.info("Attempting to set restaurant info based on user's primary restaurant for user: {}", userEmail);
-            if (user.getPrimaryRestaurant() != null) {
-                Restaurant restaurant = user.getPrimaryRestaurant();
-                response.setRestaurantInfo(new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress()));
-                return user.getPrimaryRestaurant();
-            }
-        } else {
-            log.info("RestaurantId parameter provided: {} for user: {}", restaurantId, userEmail);
-            Restaurant restaurant = Restaurant.<Restaurant>find("id = ?1", UUID.fromString(restaurantId))
-                    .firstResultOptional().orElse(null);
-            if (restaurant == null) {
-                log.warn("Restaurant not found for Get DashboardData request : {}", restaurantId);
-                throw new AppException("Restaurant not found", Response.Status.BAD_REQUEST);
-            }
-            response.setRestaurantInfo(new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress()));
-            return restaurant;
-        }
-        return null;
-    }
-
-    private static void setRestaurantListInfo(User user, DashboardResponse response) {
-        response.setAssociatedRestaurants(user.getRestaurants().stream()
-                .map(r -> new RestaurantInfo(r.getId().toString(), r.getName(), r.getAddress()))
-                .toList());
-    }
-
+    @Inject
+    SubscriptionService subscriptionService;
 
     @Transactional
-    public Response getDailyOrders(String restaurantId, String fromDate, String toDate) {
-        try {
-            log.info("Daily orders report requested for restaurantId: {}, from: {}, to: {}",
-                    restaurantId, fromDate, toDate);
-            if (fromDate == null || toDate == null) {
-                log.warn("Missing date parameters for daily orders report");
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"code\": \"INVALID_INPUT\", \"message\": \"from and to parameters are required\"}")
-                        .build();
-            }
-
-            OffsetDateTime startDate = OffsetDateTime.parse(fromDate, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-            OffsetDateTime endDate = OffsetDateTime.parse(toDate, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-
-            if (startDate.isAfter(endDate)) {
-                log.warn("Invalid date range: from date is after to date");
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"code\": \"INVALID_INPUT\", \"message\": \"from date must be before to date\"}")
-                        .build();
-            }
-
-            UUID restaurantUuid = UUID.fromString(restaurantId);
-
-            // Query to get daily order counts grouped by order type
-            String sql = "SELECT " +
-                    "DATE(oh.order_date_time AT TIME ZONE 'UTC') as order_date, " +
-                    "oh.order_type, " +
-                    "COUNT(*) as order_count " +
-                    "FROM order_headers oh " +
-                    "WHERE oh.restaurant_id = :restaurantId " +
-                    "AND oh.order_date_time >= :startDate " +
-                    "AND oh.order_date_time <= :endDate " +
-                    "GROUP BY DATE(oh.order_date_time AT TIME ZONE 'UTC'), oh.order_type " +
-                    "ORDER BY DATE(oh.order_date_time AT TIME ZONE 'UTC') DESC";
-
-            @SuppressWarnings("unchecked")
-            List<Object[]> results = entityManager.createNativeQuery(sql)
-                    .setParameter("restaurantId", restaurantUuid)
-                    .setParameter("startDate", startDate)
-                    .setParameter("endDate", endDate)
-                    .getResultList();
-
-            // Group results by date
-            Map<String, Map<String, Integer>> groupedByDate = new LinkedHashMap<>();
-
-            for (Object[] row : results) {
-                String date = row[0].toString();
-                String orderType = (String) row[1];
-                Integer count = ((Number) row[2]).intValue();
-
-                groupedByDate.computeIfAbsent(date, k -> new HashMap<>())
-                        .put(orderType != null ? orderType : "UNKNOWN", count);
-            }
-
-            // Build response
-            List<DailyOrderResponse> response = new ArrayList<>();
-            for (Map.Entry<String, Map<String, Integer>> entry : groupedByDate.entrySet()) {
-                int totalOrders = entry.getValue().values().stream().mapToInt(Integer::intValue).sum();
-                response.add(new DailyOrderResponse(entry.getKey(), totalOrders, entry.getValue()));
-            }
-
-            log.info("Daily orders report generated successfully for restaurantId: {} with {} days",
-                    restaurantId, response.size());
-
-            return Response.ok(response).build();
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid date format or restaurant ID: {}", e.getMessage());
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"code\": \"INVALID_INPUT\", \"message\": \"Invalid date format or restaurant ID\"}")
-                    .build();
-        } catch (Exception e) {
-            log.error("Error generating daily orders report", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("{\"code\": \"INTERNAL_ERROR\", \"message\": \"Failed to generate report\"}")
-                    .build();
-        }
-    }
-
-    @Transactional
-    public Response getOrders(String fromDate, String toDate, Integer limit, Integer offset) {
-        try {
-            String restaurantId = securityIdentity.getPrincipal().getName();
-            log.info("Orders list requested for restaurantId: {}, from: {}, to: {}, limit: {}, offset: {}", restaurantId, fromDate, toDate, limit, offset);
-
-            if (fromDate == null || toDate == null) {
-                log.warn("Missing date parameters for orders list");
-                return Response.status(Response.Status.BAD_REQUEST).entity("{\"code\": \"INVALID_INPUT\", \"message\": \"from and to parameters are required\"}").build();
-            }
-
-            OffsetDateTime startDate = OffsetDateTime.parse(fromDate, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-            OffsetDateTime endDate = OffsetDateTime.parse(toDate, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-
-            UUID restaurantUuid = UUID.fromString(restaurantId);
-
-            // Query to get order details
-            String sql = "SELECT oh.id, oh.order_id, oh.order_date_time, oh.order_type, oh.amount_due, oh.sub_total " + "FROM order_headers oh " + "WHERE oh.restaurant_id = :restaurantId " + "AND oh.order_date_time >= :startDate " + "AND oh.order_date_time <= :endDate " + "ORDER BY oh.order_date_time DESC " + "LIMIT :limit OFFSET :offset";
-
-            @SuppressWarnings("unchecked") List<Object[]> results = entityManager.createNativeQuery(sql).setParameter("restaurantId", restaurantUuid).setParameter("startDate", startDate).setParameter("endDate", endDate).setParameter("limit", limit).setParameter("offset", offset).getResultList();
-
-            List<Map<String, Object>> orders = new ArrayList<>();
-            for (Object[] row : results) {
-                Map<String, Object> order = new HashMap<>();
-                order.put("id", row[0].toString());
-                order.put("orderId", row[1]);
-                order.put("orderDateTime", row[2].toString());
-                order.put("orderType", row[3]);
-                order.put("amountDue", row[4]);
-                order.put("subTotal", row[5]);
-                orders.add(order);
-            }
-
-            log.info("Orders list retrieved successfully for restaurantId: {} with {} orders", restaurantId, orders.size());
-
-            return Response.ok(orders).build();
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid date format or restaurant ID: {}", e.getMessage());
-            return Response.status(Response.Status.BAD_REQUEST).entity("{\"code\": \"INVALID_INPUT\", \"message\": \"Invalid date format or restaurant ID\"}").build();
-        } catch (Exception e) {
-            log.error("Error retrieving orders list", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"code\": \"INTERNAL_ERROR\", \"message\": \"Failed to retrieve orders\"}").build();
-        }
-    }
-
-
     public DashboardResponse getDashboardDataByDate(String restaurantId, LocalDate selectedDate) {
         try {
             String userEmail = securityIdentity.getPrincipal().getName();
             log.info("Dashboard data report requested for user: {} for date {}", userEmail, selectedDate);
-            User user = User.<User>find("email = ?1", userEmail)
-                    .firstResultOptional().orElse(null);
-            if (user == null) {
-                log.warn("User not found for Get DashboardData request : {} .", userEmail);
-                throw new AppException("User not found", Response.Status.BAD_REQUEST);
-            }
+            User user = findUserInfo(userEmail, "User not found for Get DashboardData request : {} .");
 
             DashboardResponse response = new DashboardResponse();
 
             Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, response);
             if(selectedRestaurant == null) {
                 log.warn("No restaurant selected for DashboardData request for user: {} .", userEmail);
-                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+                throw new AppException("getDashboardDataByDate:: No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
             }
             UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Validate subscription for dashboard access
+            subscriptionService.validateSubscriptionForDashboard(user.getId(), restaurantUuid);
 
             BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(), selectedDate, selectedRestaurant.getTimeZone());
@@ -302,28 +84,37 @@ public class DashboardService {
             }
 
             // Build order type breakdown (exclude the null order_type row which is the grand total)
-            List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
-            List<DailyRevenueBreakdownDto> typeData = dashboardData.stream()
-                    .filter(d -> d.getOrderType() != null)
-                    .toList();
-            for (DailyRevenueBreakdownDto dto : typeData) {
-                orderTypeInfoList.add(new OrderTypeInfo(
-                        dto.getOrderType(),
-                        dto.getOrdertypeOrderCount() != null ? dto.getOrdertypeOrderCount().intValue() : 0,
-                        dto.getOrdertypeRevenue() != null ? dto.getOrdertypeRevenue().doubleValue() : 0
-                ));
-            }
+            List<OrderTypeInfo> orderTypeInfoList = getOrderTypeInfos(dashboardData);
             response.setOrderTypeInfoList(orderTypeInfoList);
             setRestaurantListInfo(user, response);
             log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders .",
                     restaurantId, response.getStartDateTime(), response.getTotalOrders());
 
             return response;
+        } catch (AppException e) {
+            log.error("getDashboardDataByDate::AppException, Error generating dashboard data orders report", e);
+            throw e;
         } catch (Exception e) {
             log.error("Error generating daily orders report", e);
             throw new AppException("Failed to generate dashboard data", Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
+
+    private List<OrderTypeInfo> getOrderTypeInfos(List<DailyRevenueBreakdownDto> dashboardData) {
+        List<OrderTypeInfo> orderTypeInfoList = new ArrayList<>();
+        List<DailyRevenueBreakdownDto> typeData = dashboardData.stream()
+                .filter(d -> d.getOrderType() != null)
+                .toList();
+        for (DailyRevenueBreakdownDto dto : typeData) {
+            orderTypeInfoList.add(new OrderTypeInfo(
+                    dto.getOrderType(),
+                    dto.getOrdertypeOrderCount() != null ? dto.getOrdertypeOrderCount().intValue() : 0,
+                    dto.getOrdertypeRevenue() != null ? dto.getOrdertypeRevenue().doubleValue() : 0
+            ));
+        }
+        return orderTypeInfoList;
+    }
+
 
     @Transactional
     public DailyDetailedReportResponse getDailyDetailedReport(String restaurantId, LocalDate selectedDate) {
@@ -331,20 +122,18 @@ public class DashboardService {
             String userEmail = securityIdentity.getPrincipal().getName();
             log.info("Daily detailed report requested for user: {} for date: {}", userEmail, selectedDate);
 
-            User user = User.<User>find("email = ?1", userEmail)
-                    .firstResultOptional().orElse(null);
-            if (user == null) {
-                log.warn("User not found for daily detailed report request: {}", userEmail);
-                throw new AppException("User not found", Response.Status.BAD_REQUEST);
-            }
+            User user = findUserInfo(userEmail, "User not found for daily detailed report request: {}");
 
             DashboardResponse tempResponse = new DashboardResponse();
             Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
             if (selectedRestaurant == null) {
                 log.warn("No restaurant selected for daily detailed report request for user: {}", userEmail);
-                throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
+                throw new AppException("getDailyDetailedReport:: No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
             }
             UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Validate subscription for dashboard access
+            subscriptionService.validateSubscriptionForDashboard(user.getId(), restaurantUuid);
 
             BusinessWindowUtil.BusinessWindow businessWindow = BusinessWindowUtil.getBusinessWindow(
                     selectedRestaurant.getOpeningTime(), selectedRestaurant.getClosingTime(),
@@ -393,15 +182,7 @@ public class DashboardService {
                 Map<Integer, DetailedReportDataDto> distinctTransactions = entry.getValue().stream().filter(d -> d.getOrderTransactionId() != null)
                         .collect(Collectors.toMap(DetailedReportDataDto::getOrderTransactionId, d -> d,
                                 (existing, replacement) -> existing));
-                List<OrderItemDetailDto> orderItems = new ArrayList<>();
-                for (DetailedReportDataDto itemRow : distinctTransactions.values()) {
-                        OrderItemDetailDto item = new OrderItemDetailDto();
-                        item.setOrderItemName(itemRow.getMenuItemText() != null ? itemRow.getMenuItemText() : " - ");
-                        item.setQuantity(itemRow.getQuantity());
-                        item.setPrice(itemRow.getExtendedPrice());
-                        item.setDiscountGiven(itemRow.getDiscountAmount());
-                        orderItems.add(item);
-                }
+                List<OrderItemDetailDto> orderItems = getOrderItemDetailDtos(distinctTransactions);
                 orderDetail.setOrderItems(orderItems);
                 if(orderDetail.getTotalAmount() == null || orderDetail.getTotalAmount() == 0) {
                     log.warn("Order ID {} has no payment records, skipping order detail", entry.getKey());
@@ -421,11 +202,25 @@ public class DashboardService {
                     restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
             return response;
         } catch (AppException e) {
+            log.error("getDailyDetailedReport::AppException, Error generating daily detailed report", e);
             throw e;
         } catch (Exception e) {
             log.error("Error generating daily detailed report", e);
             throw new AppException("Failed to generate daily detailed report", Response.Status.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private List<OrderItemDetailDto> getOrderItemDetailDtos(Map<Integer, DetailedReportDataDto> distinctTransactions) {
+        List<OrderItemDetailDto> orderItems = new ArrayList<>();
+        for (DetailedReportDataDto itemRow : distinctTransactions.values()) {
+                OrderItemDetailDto item = new OrderItemDetailDto();
+                item.setOrderItemName(itemRow.getMenuItemText() != null ? itemRow.getMenuItemText() : " - ");
+                item.setQuantity(itemRow.getQuantity());
+                item.setPrice(itemRow.getExtendedPrice());
+                item.setDiscountGiven(itemRow.getDiscountAmount());
+                orderItems.add(item);
+        }
+        return orderItems;
     }
 
     @Transactional
@@ -434,12 +229,7 @@ public class DashboardService {
             String userEmail = securityIdentity.getPrincipal().getName();
             log.info("Monthly report requested for user: {} for month: {}", userEmail, monthStr);
 
-            User user = User.<User>find("email = ?1", userEmail)
-                    .firstResultOptional().orElse(null);
-            if (user == null) {
-                log.warn("User not found for monthly report request: {}", userEmail);
-                throw new AppException("User not found", Response.Status.BAD_REQUEST);
-            }
+            User user = findUserInfo(userEmail, "User not found for monthly report request: {}");
 
             DashboardResponse tempResponse = new DashboardResponse();
             Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
@@ -448,6 +238,9 @@ public class DashboardService {
                 throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
             }
             UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Validate subscription for dashboard access
+            subscriptionService.validateSubscriptionForDashboard(user.getId(), restaurantUuid);
 
             // Parse month string (expected format: YYYY-MM)
             YearMonth yearMonth = YearMonth.parse(monthStr);
@@ -505,6 +298,7 @@ public class DashboardService {
 
             return response;
         } catch (AppException e) {
+            log.error("getMonthlyReport::AppException, Error generating monthly report report", e);
             throw e;
         } catch (Exception e) {
             log.error("Error generating monthly report", e);
@@ -518,12 +312,7 @@ public class DashboardService {
             String userEmail = securityIdentity.getPrincipal().getName();
             log.info("Daily chart data requested for user: {} for month: {}", userEmail, monthStr);
 
-            User user = User.<User>find("email = ?1", userEmail)
-                    .firstResultOptional().orElse(null);
-            if (user == null) {
-                log.warn("User not found for daily chart data request: {}", userEmail);
-                throw new AppException("User not found", Response.Status.BAD_REQUEST);
-            }
+            User user = findUserInfo(userEmail, "User not found for daily chart data request: {}");
 
             DashboardResponse tempResponse = new DashboardResponse();
             Restaurant selectedRestaurant = extractSelectedRestaurant(restaurantId, userEmail, user, tempResponse);
@@ -532,6 +321,9 @@ public class DashboardService {
                 throw new AppException("No restaurant selected or associated with user", Response.Status.BAD_REQUEST);
             }
             UUID restaurantUuid = selectedRestaurant.getId();
+
+            // Validate subscription for dashboard access
+            subscriptionService.validateSubscriptionForDashboard(user.getId(), restaurantUuid);
 
             // Parse month string (expected format: YYYY-MM)
             YearMonth yearMonth = YearMonth.parse(monthStr);
@@ -577,11 +369,54 @@ public class DashboardService {
 
             return response;
         } catch (AppException e) {
+            log.error("getDailyChartDataForMonth::AppException, Error generating daily chart data for month report", e);
             throw e;
         } catch (Exception e) {
             log.error("Error generating daily chart data", e);
             throw new AppException("Failed to generate daily chart data", Response.Status.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private User findUserInfo(String userEmail, String s) {
+        User user = User.<User>find("email = ?1", userEmail)
+                .firstResultOptional().orElse(null);
+        if (user == null) {
+            log.warn(s, userEmail);
+            throw new AppException("User not found", Response.Status.BAD_REQUEST);
+        }
+        return user;
+    }
+
+    private Restaurant extractSelectedRestaurant(String restaurantId, String userEmail, User user, DashboardResponse response) {
+        if ("ALL".equalsIgnoreCase(restaurantId)) {
+            log.info("ALL restaurantId provided for user: {}", userEmail);
+            throw new AppException("ALL restaurantId is not supported for DashboardData request", Response.Status.BAD_REQUEST);
+        } else if (restaurantId == null || restaurantId.isEmpty()) {
+            log.warn("Missing restaurantId parameter for DashboardData request");
+            log.info("Attempting to set restaurant info based on user's primary restaurant for user: {}", userEmail);
+            if (user.getPrimaryRestaurant() != null) {
+                Restaurant restaurant = user.getPrimaryRestaurant();
+                response.setRestaurantInfo(new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress()));
+                return user.getPrimaryRestaurant();
+            }
+        } else {
+            log.info("RestaurantId parameter provided: {} for user: {}", restaurantId, userEmail);
+            Restaurant restaurant = Restaurant.<Restaurant>find("id = ?1", UUID.fromString(restaurantId))
+                    .firstResultOptional().orElse(null);
+            if (restaurant == null) {
+                log.warn("Restaurant not found for Get DashboardData request : {}", restaurantId);
+                throw new AppException("Restaurant not found", Response.Status.BAD_REQUEST);
+            }
+            response.setRestaurantInfo(new RestaurantInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress()));
+            return restaurant;
+        }
+        return null;
+    }
+
+    private static void setRestaurantListInfo(User user, DashboardResponse response) {
+        response.setAssociatedRestaurants(user.getUserRestaurants().stream()
+                .map(r -> new RestaurantInfo(r.getId().toString(), r.getRestaurant().getName(), r.getRestaurant().getAddress()))
+                .toList());
     }
 
     /**

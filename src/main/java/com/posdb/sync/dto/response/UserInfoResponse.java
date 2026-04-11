@@ -14,9 +14,7 @@ public class UserInfoResponse {
     private String email;
     private String phoneNumber;
 
-    private RestaurantInfo primaryRestaurant;
-    private List<RestaurantInfo> associatedRestaurants;
-
-
+    private RestaurantSubscriptionInfo primaryRestaurant;
+    private List<RestaurantSubscriptionInfo> associatedRestaurants;
 }
 
