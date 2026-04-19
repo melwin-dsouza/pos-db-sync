@@ -87,7 +87,7 @@ This is your guide to the **Multi-Tenant POS Database Synchronization System**. 
 ### "I want to understand the architecture"
 1. Read: [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)
 2. Look at: Source code in `src/main/java/com/posdb/sync/`
-3. Understand: Database schema from [schema.sql](src/main/resources/schema.sql)
+3. Understand: Database schema from [schema.sql](../src/main/resources/V1__Initial_schema.sql)
 
 ### "I'm deploying to production"
 1. Follow: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - Pre-deployment section

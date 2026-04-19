@@ -29,7 +29,7 @@ CREATE DATABASE pos_db;
 ### Step 3: Execute Schema
 ```bash
 # Execute SQL migration
-psql -U postgres -d pos_db -f src/main/resources/schema.sql
+psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
 
 # Verify tables
 psql -U postgres -d pos_db -c "\dt"
@@ -127,7 +127,7 @@ psql -U postgres -c "CREATE DATABASE pos_db;"
 ### Issue: "relation \"restaurant\" does not exist"
 **Solution:** Execute schema
 ```bash
-psql -U postgres -d pos_db -f src/main/resources/schema.sql
+psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
 ```
 
 ### Issue: "Invalid admin credentials"

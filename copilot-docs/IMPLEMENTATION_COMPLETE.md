@@ -126,7 +126,7 @@ Root documentation/
 createdb pos_db
 
 # Execute schema
-psql -U postgres -d pos_db -f src/main/resources/schema.sql
+psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
 
 # Verify tables created
 psql -U postgres -d pos_db -c "\dt"

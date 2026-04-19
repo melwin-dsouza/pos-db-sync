@@ -186,7 +186,7 @@ createdb pos_db
 
 ### Step 2: Execute Schema
 ```bash
-psql -U postgres -d pos_db -f src/main/resources/schema.sql
+psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
 ```
 
 ### Step 3: Generate Admin Password Hash

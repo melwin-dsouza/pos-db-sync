@@ -28,7 +28,7 @@ A production-ready multi-tenant POS order synchronization system built with Quar
 
 2. **Execute schema**
    ```bash
-   psql -U postgres -d pos_db -f src/main/resources/schema.sql
+   psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
    ```
 
 3. **Set environment variables**
@@ -132,7 +132,7 @@ java -jar target/quarkus-app/quarkus-run.jar
 createdb pos_db
 
 # Execute schema
-psql -U postgres -d pos_db -f src/main/resources/schema.sql
+psql -U postgres -d pos_db -f src/main/resources/V1__Initial_schema.sql
 
 # Verify tables
 psql -U postgres -d pos_db -c "\dt"
