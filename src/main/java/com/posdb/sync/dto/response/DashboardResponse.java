@@ -2,6 +2,7 @@ package com.posdb.sync.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -32,6 +33,11 @@ public class DashboardResponse {
 
     private List<OrderTypeInfo> orderTypeInfoList;
 
+    // Void order metrics
+    private Integer voidOrderCount;
+    private BigDecimal totalVoidAmount;
 
+    // Inhouse order metrics
+    private Integer inhouseOrderCount;
+    private BigDecimal totalInhouseAmount;
 }
-

@@ -3,6 +3,7 @@ package com.posdb.sync.dto.response;
 import com.posdb.sync.repository.dto.HourlyReportDataDto;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -15,5 +16,12 @@ public class DailyDetailedReportResponse {
     private Integer totalOrders;
     private List<OrderDetailDto> orderList;
     private List<HourlyReportDataDto> hourlyBreakdown;
-}
 
+    // Void order metrics
+    private Integer voidOrderCount;
+    private BigDecimal totalVoidAmount;
+
+    // Inhouse order metrics
+    private Integer inhouseOrderCount;
+    private BigDecimal totalInhouseAmount;
+}

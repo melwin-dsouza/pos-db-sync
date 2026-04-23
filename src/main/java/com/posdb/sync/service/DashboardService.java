@@ -86,6 +86,34 @@ public class DashboardService {
             // Build order type breakdown (exclude the null order_type row which is the grand total)
             List<OrderTypeInfo> orderTypeInfoList = getOrderTypeInfos(dashboardData);
             response.setOrderTypeInfoList(orderTypeInfoList);
+
+            // Fetch void order metrics
+            List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
+            if (voidMetrics != null && !voidMetrics.isEmpty()) {
+                response.setVoidOrderCount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getVoidOrderCount)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Long::intValue)
+                        .sum());
+
+                response.setTotalVoidAmount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getTotalVoidAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+            } else {
+                response.setVoidOrderCount(0);
+                response.setTotalVoidAmount(java.math.BigDecimal.ZERO);
+            }
+            // Fetch inhouse order metrics
+            InhouseOrderMetricsDto inhouseMetrics = dashboardRepository.getInhouseOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
+            if (inhouseMetrics != null) {
+                response.setInhouseOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
+                response.setTotalInhouseAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
+            } else {
+                response.setInhouseOrderCount(0);
+                response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
+            }
+
             setRestaurantListInfo(user, response);
             log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders .",
                     restaurantId, response.getStartDateTime(), response.getTotalOrders());
@@ -198,6 +226,34 @@ public class DashboardService {
             List<HourlyReportDataDto> hourlyBreakdown = calculateHourlyBreakdown(queryData);
             response.setHourlyBreakdown(hourlyBreakdown);
 
+            // Fetch void order metrics
+            List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
+            if (voidMetrics != null && !voidMetrics.isEmpty()) {
+                response.setVoidOrderCount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getVoidOrderCount)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Long::intValue)
+                        .sum());
+
+                response.setTotalVoidAmount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getTotalVoidAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+            } else {
+                response.setVoidOrderCount(0);
+                response.setTotalVoidAmount(java.math.BigDecimal.ZERO);
+            }
+
+            // Fetch inhouse order metrics
+            InhouseOrderMetricsDto inhouseMetrics = dashboardRepository.getInhouseOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
+            if (inhouseMetrics != null) {
+                response.setInhouseOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
+                response.setTotalInhouseAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
+            } else {
+                response.setInhouseOrderCount(0);
+                response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
+            }
+
             log.info("Daily detailed report generated successfully for restaurantId: {} for startTime: {} endTime:{} with {} orders",
                     restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
             return response;
@@ -292,6 +348,34 @@ public class DashboardService {
             response.setMonthStartDate(monthStart);
             response.setMonthEndDate(monthEnd);
             response.setByOrderTypeList(orderTypeList);
+
+            // Fetch void order metrics for the month
+            List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, monthStartDateTime, monthEndDateTime);
+            if (voidMetrics != null && !voidMetrics.isEmpty()) {
+                response.setVoidOrderCount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getVoidOrderCount)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Long::intValue)
+                        .sum());
+
+                response.setTotalVoidAmount(voidMetrics.stream()
+                        .map(VoidOrderMetricsDto::getTotalVoidAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+            } else {
+                response.setVoidOrderCount(0);
+                response.setTotalVoidAmount(java.math.BigDecimal.ZERO);
+            }
+
+            // Fetch inhouse order metrics for the month
+            InhouseOrderMetricsDto inhouseMetrics = dashboardRepository.getInhouseOrderMetrics(restaurantUuid, monthStartDateTime, monthEndDateTime);
+            if (inhouseMetrics != null) {
+                response.setInhouseOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
+                response.setTotalInhouseAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
+            } else {
+                response.setInhouseOrderCount(0);
+                response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
+            }
 
             log.info("Monthly report generated successfully for restaurantId: {} for month: {} with total revenue: {}",
                     restaurantId, monthStr, totalRevenue);

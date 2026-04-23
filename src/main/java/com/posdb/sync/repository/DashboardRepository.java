@@ -112,4 +112,38 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 .setParameter("endDate", endDate)
                 .getResultList();
     }
+
+    public List<VoidOrderMetricsDto> getVoidOrderMetrics(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        return getEntityManager()
+                .createQuery("SELECT new com.posdb.sync.repository.dto.VoidOrderMetricsDto(" +
+                        "COUNT(*), COALESCE(SUM(voidAmount), 0)) " +
+                        "FROM OrderVoidLog ovl " +
+                        "INNER JOIN OrderHeader oh ON ovl.orderId = oh.orderId " +
+                        "WHERE ovl.restaurant.id = :restaurantId " +
+                        "AND oh.restaurant.id = :restaurantId " +
+                        "AND oh.orderDateTime >= :startDate " +
+                        "AND oh.orderDateTime <= :endDate " +
+                        "GROUP BY ovl.orderId " +
+                        "HAVING SUM(ovl.voidAmount) > 0", VoidOrderMetricsDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
+    public InhouseOrderMetricsDto getInhouseOrderMetrics(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        return getEntityManager()
+                .createQuery("SELECT new com.posdb.sync.repository.dto.InhouseOrderMetricsDto(" +
+                        "COUNT(DISTINCT oac.orderId), COALESCE(SUM(oac.amountCharged), 0)) " +
+                        "FROM OnAccountCharge oac " +
+                        "INNER JOIN OrderHeader oh ON oac.orderId = oh.orderId " +
+                        "WHERE oac.restaurant.id = :restaurantId " +
+                        "AND oh.restaurant.id = :restaurantId " +
+                        "AND oh.orderDateTime >= :startDate " +
+                        "AND oh.orderDateTime <= :endDate", InhouseOrderMetricsDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getSingleResultOrNull();
+    }
 }

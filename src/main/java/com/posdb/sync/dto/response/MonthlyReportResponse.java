@@ -17,5 +17,12 @@ public class MonthlyReportResponse {
     private LocalDate monthStartDate;
     private LocalDate monthEndDate;
     private List<OrderTypeDto> byOrderTypeList;
-}
 
+    // Void order metrics
+    private Integer voidOrderCount;
+    private BigDecimal totalVoidAmount;
+
+    // Inhouse order metrics
+    private Integer inhouseOrderCount;
+    private BigDecimal totalInhouseAmount;
+}
