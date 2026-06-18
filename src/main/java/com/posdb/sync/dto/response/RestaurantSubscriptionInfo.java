@@ -13,6 +13,9 @@ public class RestaurantSubscriptionInfo {
     private String restaurantId;
     private String restaurantName;
     private String restaurantAddress;
+    private String currencyCode;
+    private String countryCode;
+    private String countryName;
 
     // Subscription details
     private SubscriptionTypeEnum subscriptionType;

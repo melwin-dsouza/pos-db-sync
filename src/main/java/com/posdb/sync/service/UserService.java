@@ -97,6 +97,9 @@ public class UserService {
                     restaurant.getId().toString(),
                     restaurant.getName(),
                     restaurant.getAddress(),
+                    restaurant.getCurrencyCode(),
+                    restaurant.getCountryCode(),
+                    restaurant.getCountryName(),
                     userRestaurant.getSubscriptionType(),
                     userRestaurant.getSubscriptionStartDate(),
                     userRestaurant.getSubscriptionExpiryDate(),
@@ -122,12 +125,16 @@ public class UserService {
         if(userRestaurant == null) {
             log.warn("No subscription info found for userId: {} and restaurantId: {}", user.getId(), restaurant.getId());
             return new RestaurantSubscriptionInfo(restaurant.getId().toString(), restaurant.getName(), restaurant.getAddress(),
+                    restaurant.getCurrencyCode(), restaurant.getCountryCode(), restaurant.getCountryName(),
                     null, null, null, false);
         }
         return new RestaurantSubscriptionInfo(
                 restaurant.getId().toString(),
                 restaurant.getName(),
                 restaurant.getAddress(),
+                restaurant.getCurrencyCode(),
+                restaurant.getCountryCode(),
+                restaurant.getCountryName(),
                 userRestaurant.getSubscriptionType(),
                 userRestaurant.getSubscriptionStartDate(),
                 userRestaurant.getSubscriptionExpiryDate(),

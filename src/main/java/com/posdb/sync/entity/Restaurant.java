@@ -66,6 +66,15 @@ public class Restaurant extends PanacheEntityBase {
     @Column(name = "time_zone")
     private String timeZone;
 
+    @Column(name = "currency_code")
+    private String currencyCode;
+
+    @Column(name = "country_code")
+    private String countryCode;
+
+    @Column(name = "country_name")
+    private String countryName;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private OffsetDateTime createdAt;

@@ -25,10 +25,6 @@ public class DashboardResponse {
     private String topSellingItem;
     private Integer numberOfGuests;
     private Double totalDiscounts;
-    private Double averageRevenuePerGuest;
-    private Double averageRevenuePerOrder;
-    private Double averageItemsPerOrder;
-    private Double averageRevenuePerItem;
     private Double averageOrderValue;
 
     private List<OrderTypeInfo> orderTypeInfoList;
@@ -38,6 +34,6 @@ public class DashboardResponse {
     private BigDecimal totalVoidAmount;
 
     // Inhouse order metrics
-    private Integer inhouseOrderCount;
-    private BigDecimal totalInhouseAmount;
+    private Integer onlineOrderCount;
+    private BigDecimal totalOnlineOrderAmount;
 }

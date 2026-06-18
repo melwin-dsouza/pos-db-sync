@@ -36,11 +36,12 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
         // Use the built-in EntityManager for custom queries
         return getEntityManager()
                 .createQuery("SELECT NEW com.posdb.sync.repository.dto.DailyRevenueBreakdownDto(" +
-                        "COUNT(DISTINCT oh.orderId), COUNT(DISTINCT oh.guestNumber), SUM(op.amountPaid), " +
+                        "COUNT(DISTINCT oh.orderId), SUM(oh.guestNumber), SUM(op.amountPaid), " +
                         "SUM(oh.discountAmount), oh.orderType, COUNT(DISTINCT oh.orderId), SUM(op.amountPaid)) " +
                         "FROM OrderHeader oh " +
                         "INNER JOIN OrderPayment op ON oh.orderId = op.orderId " +
                         "WHERE oh.restaurant.id = :restaurantId " +
+                        "AND op.amountPaid > 0 " +
                         "AND op.restaurant.id = :restaurantId " +
                         "AND oh.orderDateTime >= :startDate " +
                         "AND oh.orderDateTime <= :endDate " +
@@ -54,18 +55,21 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
 
 
     public List<DetailedReportDataDto> getDailyDetailedReportData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
-        // Fetch order headers with their payments and transactions
+        // Fetch order headers with their payments OR inhouseOrders and transactions
         return getEntityManager()
                 .createQuery("SELECT new com.posdb.sync.repository.dto.DetailedReportDataDto(" +
                 " oh.orderId, oh.orderDateTime, oh.orderType, oh.guestNumber, " +
-                " op.orderPaymentId, op.paymentMethod, op.amountPaid, " +
+                        " COALESCE(op.orderPaymentId, oac.orderChargeId), " +
+                        " COALESCE(op.paymentMethod, CAST('ONLINE_ORDER' AS String)), " +
+                        " COALESCE(op.amountPaid, oac.amountCharged), " +
                 " ot.orderTransactionId, ot.menuItemId, ot.quantity, ot.extendedPrice, ot.discountAmount, " +
                 " mi.menuItemText) " +
                 " FROM OrderHeader oh " +
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId AND op.restaurant.id = :restaurantId " +
+                        " LEFT JOIN OnAccountCharge oac ON oac.orderId = oh.orderId AND oac.restaurant.id = :restaurantId AND op.orderId IS NULL " +
                 " LEFT JOIN OrderTransaction ot ON ot.orderId = oh.orderId AND ot.restaurant.id = :restaurantId " +
                 " LEFT JOIN MenuItem mi ON mi.menuItemId = ot.menuItemId AND mi.restaurant.id = :restaurantId " +
-                " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId AND ot.restaurant.id = :restaurantId " +
+                " WHERE oh.restaurant.id = :restaurantId  AND ot.restaurant.id = :restaurantId AND ( oac.restaurant.id = :restaurantId OR op.restaurant.id = :restaurantId )" +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " ORDER BY oh.orderId, ot.orderTransactionId", DetailedReportDataDto.class)
@@ -81,6 +85,7 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                 " FROM OrderHeader oh " +
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
                 " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId" +
+                " AND op.amountPaid > 0 " +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " GROUP BY oh.orderType " +
@@ -96,10 +101,12 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
 
     public List<DailyChartDataDto> getDailyChartData(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
         String query = "SELECT new com.posdb.sync.repository.dto.DailyChartDataDto(" +
-                " CAST(oh.orderDateTime AS LocalDate), COUNT(DISTINCT oh.orderId), COALESCE(SUM(op.amountPaid), 0))" +
+                " CAST(oh.orderDateTime AS LocalDate), COUNT(DISTINCT oh.orderId), SUM(COALESCE(op.amountPaid, 0) + COALESCE(oac.amountCharged, 0)))" +
                 " FROM OrderHeader oh " +
                 " LEFT JOIN OrderPayment op ON op.orderId = oh.orderId" +
-                " WHERE oh.restaurant.id = :restaurantId AND op.restaurant.id = :restaurantId" +
+                    " LEFT JOIN OnAccountCharge oac ON oac.orderId = oh.orderId AND op.orderId IS NULL " +
+                " WHERE oh.restaurant.id = :restaurantId AND  ( oac.restaurant.id = :restaurantId OR op.restaurant.id = :restaurantId )" +
+                " AND (op.amountPaid > 0 OR oac.amountCharged >0 )" +
                 " AND oh.orderDateTime >= :startDate " +
                 " AND oh.orderDateTime <= :endDate " +
                 " GROUP BY CAST(oh.orderDateTime AS LocalDate) " +
@@ -125,6 +132,27 @@ public class DashboardRepository implements PanacheRepository<OrderHeader> {
                         "AND oh.orderDateTime <= :endDate " +
                         "GROUP BY ovl.orderId " +
                         "HAVING SUM(ovl.voidAmount) > 0", VoidOrderMetricsDto.class)
+                .setParameter("restaurantId", restaurantId)
+                .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
+                .getResultList();
+    }
+
+    public List<DetailedReportDataDto> getVoidOrderList(UUID restaurantId, OffsetDateTime startDate, OffsetDateTime endDate) {
+        return getEntityManager()
+                .createQuery("SELECT new com.posdb.sync.repository.dto.DetailedReportDataDto(" +
+                        " oh.orderId, oh.orderDateTime, oh.orderType, oh.guestNumber, " +
+                        " ovl.autoId, ovl.voidReason, ovl.voidAmount, " +
+                        " ot.orderTransactionId, ot.menuItemId, ot.quantity, ot.extendedPrice, ot.discountAmount, " +
+                        " mi.menuItemText) " +
+                        " FROM OrderHeader oh " +
+                        " LEFT JOIN OrderVoidLog ovl ON ovl.orderId = oh.orderId AND ovl.restaurant.id = :restaurantId " +
+                        " LEFT JOIN OrderTransaction ot ON ot.orderId = ovl.orderId AND (ovl.orderTransactionId IS NULL OR ot.orderTransactionId = ovl.orderTransactionId) AND ot.restaurant.id = :restaurantId " +
+                        " LEFT JOIN MenuItem mi ON mi.menuItemId = ot.menuItemId AND mi.restaurant.id = :restaurantId " +
+                        " WHERE oh.restaurant.id = :restaurantId AND ovl.restaurant.id = :restaurantId AND ot.restaurant.id = :restaurantId " +
+                        " AND oh.orderDateTime >= :startDate " +
+                        " AND oh.orderDateTime <= :endDate " +
+                        " ORDER BY oh.orderId, ot.orderTransactionId", DetailedReportDataDto.class)
                 .setParameter("restaurantId", restaurantId)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)

@@ -3,6 +3,7 @@ package com.posdb.sync.service;
 import com.posdb.sync.dto.response.*;
 import com.posdb.sync.entity.Restaurant;
 import com.posdb.sync.entity.User;
+import com.posdb.sync.entity.enums.OrderTypeEnum;
 import com.posdb.sync.exception.AppException;
 import com.posdb.sync.repository.DashboardRepository;
 import com.posdb.sync.repository.dto.*;
@@ -80,7 +81,6 @@ public class DashboardService {
                 response.setNumberOfGuests(totalRow.getTotalGuests() != null ? totalRow.getTotalGuests().intValue() : 0);
                 response.setTotalRevenue(totalRow.getTotalRevenue() != null ? totalRow.getTotalRevenue().doubleValue() : 0);
                 response.setTotalDiscounts(totalRow.getTotalDiscounts() != null ? totalRow.getTotalDiscounts().doubleValue() : 0);
-                response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
             }
 
             // Build order type breakdown (exclude the null order_type row which is the grand total)
@@ -89,13 +89,9 @@ public class DashboardService {
 
             // Fetch void order metrics
             List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
-            if (voidMetrics != null && !voidMetrics.isEmpty()) {
-                response.setVoidOrderCount(voidMetrics.stream()
-                        .map(VoidOrderMetricsDto::getVoidOrderCount)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Long::intValue)
-                        .sum());
-
+            log.info("Void order metrics fetched for restaurantId: {} for date: {} with {} void orders", restaurantId, selectedDate, voidMetrics.size());
+            if (!voidMetrics.isEmpty()) {
+                response.setVoidOrderCount(voidMetrics.size());
                 response.setTotalVoidAmount(voidMetrics.stream()
                         .map(VoidOrderMetricsDto::getTotalVoidAmount)
                         .filter(Objects::nonNull)
@@ -106,12 +102,30 @@ public class DashboardService {
             }
             // Fetch inhouse order metrics
             InhouseOrderMetricsDto inhouseMetrics = dashboardRepository.getInhouseOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
+            log.info("Inhouse order metrics fetched for restaurantId: {} for date: {} with {} inhouse orders", restaurantId, selectedDate, inhouseMetrics != null ? inhouseMetrics.getInhouseOrderCount() : 0);
             if (inhouseMetrics != null) {
-                response.setInhouseOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
-                response.setTotalInhouseAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
+                response.setOnlineOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
+                response.setTotalOnlineOrderAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
             } else {
-                response.setInhouseOrderCount(0);
-                response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
+                response.setOnlineOrderCount(0);
+                response.setTotalOnlineOrderAmount(java.math.BigDecimal.ZERO);
+            }
+
+
+
+            if(response.getOnlineOrderCount() > 0){
+                log.info("Adding online orders to dashboard totals for restaurantId: {} for date: {} current orders {} with {} online orders", restaurantId, selectedDate,response.getTotalOrders(), response.getOnlineOrderCount());
+                response.setTotalOrders(response.getOnlineOrderCount() + response.getTotalOrders());
+            }
+            if(response.getTotalOnlineOrderAmount() != null && response.getTotalOnlineOrderAmount().compareTo(BigDecimal.ZERO) > 0){
+                log.info("Adding online order revenue to dashboard totals for restaurantId: {} for date: {} current revenue {} with online order revenue {}", restaurantId, selectedDate,response.getTotalRevenue(), response.getTotalOnlineOrderAmount());
+                response.setTotalRevenue(response.getTotalOnlineOrderAmount().doubleValue() + response.getTotalRevenue());
+            }
+            response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
+
+            if(response.getOnlineOrderCount() > 0){
+                response.getOrderTypeInfoList().add(
+                        new OrderTypeInfo(OrderTypeEnum.ONLINE_ORDER, response.getOnlineOrderCount(), response.getTotalOnlineOrderAmount() != null ? response.getTotalOnlineOrderAmount().doubleValue() : 0));
             }
 
             setRestaurantListInfo(user, response);
@@ -175,51 +189,13 @@ public class DashboardService {
             Map<Integer, List<DetailedReportDataDto>> orderMap = queryData.stream()
                     .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
 
-            List<DetailedReportDataDto> distinctEntries = queryData.stream().filter(d -> d.getOrderPaymentId() != null)
-                    .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
-                            (existing, replacement) -> existing // If ID matches, keep the first one found
-            )).values().stream().toList();
-
-            response.setTotalRevenue(distinctEntries.stream()
-                    .filter(d -> d.getAmountPaid() != null)
-                    .mapToDouble(d -> d.getAmountPaid().doubleValue())
-                    .sum());
-            List<OrderDetailDto> orderDetails = new ArrayList<>();
-            for(Map.Entry<Integer, List<DetailedReportDataDto>> entry : orderMap.entrySet()) {
-                log.info("Order ID: {}, number of items: {}", entry.getKey(), entry.getValue().size());
-                OrderDetailDto orderDetail = new OrderDetailDto();
-                orderDetail.setOrderNumber(entry.getKey());
-                if(entry.getValue().get(0) != null) {
-                    Map<Integer, DetailedReportDataDto> distinctPayments = entry.getValue().stream().filter(d -> d.getOrderPaymentId() != null)
-                            .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
-                                    (existing, replacement) -> existing));
-                    log.info("distinctPayments for Order ID {}: {}", entry.getKey(), distinctPayments.size());
-                    orderDetail.setOrderTime(entry.getValue().get(0).getOrderDateTime());
-                    orderDetail.setTotalAmount(distinctPayments.values().stream()
-                            .filter(d -> d.getAmountPaid() != null)
-                            .mapToDouble(d -> d.getAmountPaid().doubleValue())
-                            .sum());
-                    orderDetail.setPaymentMode(distinctPayments.values().stream()
-                            .filter(d -> d.getPaymentMethod() != null)
-                            .map(DetailedReportDataDto::getPaymentMethod)
-                            .distinct()
-                            .collect(Collectors.joining(", ")));
-                    orderDetail.setGuests(entry.getValue().get(0).getGuestNumber());
-                    orderDetail.setOrderType(entry.getValue().get(0).getOrderType() != null ? entry.getValue().get(0).getOrderType().name() : "UNKNOWN");
-                }
-                Map<Integer, DetailedReportDataDto> distinctTransactions = entry.getValue().stream().filter(d -> d.getOrderTransactionId() != null)
-                        .collect(Collectors.toMap(DetailedReportDataDto::getOrderTransactionId, d -> d,
-                                (existing, replacement) -> existing));
-                List<OrderItemDetailDto> orderItems = getOrderItemDetailDtos(distinctTransactions);
-                orderDetail.setOrderItems(orderItems);
-                if(orderDetail.getTotalAmount() == null || orderDetail.getTotalAmount() == 0) {
-                    log.warn("Order ID {} has no payment records, skipping order detail", entry.getKey());
-                }else {
-                    orderDetails.add(orderDetail);
-                }
-            }
+            List<OrderDetailDto> orderDetails = extractOrderDetails(orderMap);
             orderDetails.sort(Comparator.comparing(OrderDetailDto::getOrderTime));
             response.setOrderList(orderDetails);
+            response.setTotalRevenue(orderDetails.stream()
+                    .filter(o -> o.getTotalAmount() != null)
+                    .mapToDouble(OrderDetailDto::getTotalAmount)
+                    .sum());
             response.setTotalOrders(orderDetails.size());
 
             // Calculate hourly breakdown
@@ -227,32 +203,28 @@ public class DashboardService {
             response.setHourlyBreakdown(hourlyBreakdown);
 
             // Fetch void order metrics
-            List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
-            if (voidMetrics != null && !voidMetrics.isEmpty()) {
-                response.setVoidOrderCount(voidMetrics.stream()
-                        .map(VoidOrderMetricsDto::getVoidOrderCount)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Long::intValue)
-                        .sum());
+            List<DetailedReportDataDto> voidMetrics = dashboardRepository.getVoidOrderList(restaurantUuid, businessWindow.start(), businessWindow.end());
+            // Group data by orderId to build order details
+            Map<Integer, List<DetailedReportDataDto>> voidOrderMap = voidMetrics.stream()
+                    .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
+            List<OrderDetailDto> voidOrderDetails = extractOrderDetails(voidOrderMap);
+            voidOrderDetails.sort(Comparator.comparing(OrderDetailDto::getOrderTime));
+            response.setVoidOrderList(voidOrderDetails);
+            response.setVoidOrderCount(voidOrderDetails.size());
+            response.setTotalVoidAmount(voidOrderDetails.stream()
+                    .filter(o -> o.getTotalAmount() != null)
+                    .mapToDouble(OrderDetailDto::getTotalAmount)
+                    .sum());
 
-                response.setTotalVoidAmount(voidMetrics.stream()
-                        .map(VoidOrderMetricsDto::getTotalVoidAmount)
-                        .filter(Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add));
-            } else {
-                response.setVoidOrderCount(0);
-                response.setTotalVoidAmount(java.math.BigDecimal.ZERO);
-            }
-
-            // Fetch inhouse order metrics
-            InhouseOrderMetricsDto inhouseMetrics = dashboardRepository.getInhouseOrderMetrics(restaurantUuid, businessWindow.start(), businessWindow.end());
-            if (inhouseMetrics != null) {
-                response.setInhouseOrderCount(inhouseMetrics.getInhouseOrderCount() != null ? inhouseMetrics.getInhouseOrderCount().intValue() : 0);
-                response.setTotalInhouseAmount(inhouseMetrics.getTotalInhouseAmount() != null ? inhouseMetrics.getTotalInhouseAmount() : java.math.BigDecimal.ZERO);
-            } else {
-                response.setInhouseOrderCount(0);
-                response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
-            }
+            // Set inhouse order metrics
+            response.setOnlineOrderCount((int) response.getOrderList().stream()
+                    .filter(o -> OrderTypeEnum.ONLINE_ORDER.name().equalsIgnoreCase(o.getOrderType()))
+                    .count());
+            response.setTotalOnlineOrderAmount(response.getOrderList().stream()
+                    .filter(o -> OrderTypeEnum.ONLINE_ORDER.name().equalsIgnoreCase(o.getOrderType()))
+                    .filter(o -> o.getTotalAmount() != null)
+                    .mapToDouble(OrderDetailDto::getTotalAmount)
+                    .sum());
 
             log.info("Daily detailed report generated successfully for restaurantId: {} for startTime: {} endTime:{} with {} orders",
                     restaurantId, businessWindow.start(),businessWindow.end(), orderMap.size());
@@ -264,6 +236,51 @@ public class DashboardService {
             log.error("Error generating daily detailed report", e);
             throw new AppException("Failed to generate daily detailed report", Response.Status.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private List<OrderDetailDto> extractOrderDetails(Map<Integer, List<DetailedReportDataDto>> orderMap) {
+        List<OrderDetailDto> orderDetails = new ArrayList<>();
+        for(Map.Entry<Integer, List<DetailedReportDataDto>> entry : orderMap.entrySet()) {
+            log.info("Order ID: {}, number of items: {}", entry.getKey(), entry.getValue().size());
+            OrderDetailDto orderDetail = new OrderDetailDto();
+            orderDetail.setOrderNumber(entry.getKey());
+            if(entry.getValue().get(0) != null) {
+                Map<Integer, DetailedReportDataDto> distinctPayments = entry.getValue().stream().filter(d -> d.getOrderPaymentId() != null)
+                        .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
+                                (existing, replacement) -> existing));
+                log.info("distinctPayments for Order ID {}: {}", entry.getKey(), distinctPayments.size());
+                orderDetail.setOrderTime(entry.getValue().get(0).getOrderDateTime());
+                orderDetail.setTotalAmount(distinctPayments.values().stream()
+                        .filter(d -> d.getAmountPaid() != null)
+                        .mapToDouble(d -> d.getAmountPaid().doubleValue())
+                        .sum());
+                orderDetail.setPaymentMode(distinctPayments.values().stream()
+                        .filter(d -> d.getPaymentMethod() != null)
+                        .map(DetailedReportDataDto::getPaymentMethod)
+                        .distinct()
+                        .collect(Collectors.joining(", ")));
+                // Edge case - added after inhouse orders
+                OrderTypeEnum orderType = entry.getValue().get(0).getOrderType();
+                String paymentMethod = entry.getValue().get(0).getPaymentMethod();
+                if(paymentMethod != null && paymentMethod.equalsIgnoreCase("ONLINE_ORDER")){
+                    orderDetail.setOrderType(OrderTypeEnum.ONLINE_ORDER.name());
+                }else {
+                    orderDetail.setOrderType(orderType != null ? orderType.name() : "UNKNOWN");
+                    orderDetail.setGuests(entry.getValue().get(0).getGuestNumber());
+                }
+            }
+            Map<Integer, DetailedReportDataDto> distinctTransactions = entry.getValue().stream().filter(d -> d.getOrderTransactionId() != null)
+                    .collect(Collectors.toMap(DetailedReportDataDto::getOrderTransactionId, d -> d,
+                            (existing, replacement) -> existing));
+            List<OrderItemDetailDto> orderItems = getOrderItemDetailDtos(distinctTransactions);
+            orderDetail.setOrderItems(orderItems);
+            if(orderDetail.getTotalAmount() == null || orderDetail.getTotalAmount() == 0) {
+                log.warn("Order ID {} has no payment records, skipping order detail", entry.getKey());
+            }else {
+                orderDetails.add(orderDetail);
+            }
+        }
+        return orderDetails;
     }
 
     private List<OrderItemDetailDto> getOrderItemDetailDtos(Map<Integer, DetailedReportDataDto> distinctTransactions) {
@@ -332,12 +349,6 @@ public class DashboardService {
                 typeDto.setNumberOfOrders(item.getNumberOfOrders().intValue());
                 typeDto.setSumOfAmountPaid(item.getSumOfAmountPaid());
 
-                // Calculate percentage of total revenue
-                double percentage = totalRevenue.compareTo(BigDecimal.ZERO) > 0
-                        ? (item.getSumOfAmountPaid().doubleValue() / totalRevenue.doubleValue()) * 100
-                        : 0.0;
-                typeDto.setPercentageOfTotalRevenue(Math.round(percentage * 100.0) / 100.0);
-
                 orderTypeList.add(typeDto);
             }
 
@@ -352,12 +363,7 @@ public class DashboardService {
             // Fetch void order metrics for the month
             List<VoidOrderMetricsDto> voidMetrics = dashboardRepository.getVoidOrderMetrics(restaurantUuid, monthStartDateTime, monthEndDateTime);
             if (voidMetrics != null && !voidMetrics.isEmpty()) {
-                response.setVoidOrderCount(voidMetrics.stream()
-                        .map(VoidOrderMetricsDto::getVoidOrderCount)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Long::intValue)
-                        .sum());
-
+                response.setVoidOrderCount(voidMetrics.size());
                 response.setTotalVoidAmount(voidMetrics.stream()
                         .map(VoidOrderMetricsDto::getTotalVoidAmount)
                         .filter(Objects::nonNull)
@@ -377,6 +383,34 @@ public class DashboardService {
                 response.setTotalInhouseAmount(java.math.BigDecimal.ZERO);
             }
 
+
+            if(response.getInhouseOrderCount() > 0){
+                response.setTotalOrders(response.getInhouseOrderCount() + response.getByOrderTypeList().stream()
+                        .map(OrderTypeDto::getNumberOfOrders)
+                        .reduce(0, Integer::sum));
+            }else{
+                response.setTotalOrders(response.getByOrderTypeList().stream()
+                        .map(OrderTypeDto::getNumberOfOrders)
+                        .reduce(0, Integer::sum));
+            }
+            if(response.getTotalInhouseAmount() != null && response.getTotalInhouseAmount().compareTo(BigDecimal.ZERO) > 0){
+                response.setTotalMonthlyRevenue(response.getTotalInhouseAmount().add(totalRevenue));
+            }
+
+            if(response.getInhouseOrderCount() > 0){
+                OrderTypeDto typeDto = new OrderTypeDto();
+                typeDto.setOrderType(OrderTypeEnum.ONLINE_ORDER.name());
+                typeDto.setNumberOfOrders(response.getInhouseOrderCount());
+                typeDto.setSumOfAmountPaid(response.getTotalInhouseAmount() != null ? response.getTotalInhouseAmount() : BigDecimal.ZERO);
+                response.getByOrderTypeList().add(typeDto);
+            }
+            for(OrderTypeDto item : response.getByOrderTypeList()) {
+                // Calculate percentage of total revenue
+                double percentage = response.getTotalMonthlyRevenue().compareTo(BigDecimal.ZERO) > 0
+                        ? (item.getSumOfAmountPaid().doubleValue() / response.getTotalMonthlyRevenue().doubleValue()) * 100
+                        : 0.0;
+                item.setPercentageOfTotalRevenue(Math.round(percentage * 100.0) / 100.0);
+            }
             log.info("Monthly report generated successfully for restaurantId: {} for month: {} with total revenue: {}",
                     restaurantId, monthStr, totalRevenue);
 
@@ -534,10 +568,16 @@ public class DashboardService {
                             (existing, replacement) -> existing))
                     .values().stream().toList();
 
+            // Get distinct orders for this hour to avoid double counting
+            List<DetailedReportDataDto> distinctOrders = hourData.stream()
+                    .filter(d -> d.getOrderId() != null)
+                    .collect(Collectors.toMap(DetailedReportDataDto::getOrderId, d -> d,
+                            (existing, replacement) -> existing))
+                    .values().stream().toList();
+
             // Get distinct orders for this hour
-            int orderCount = (int) hourData.stream()
-                    .map(DetailedReportDataDto::getOrderId)
-                    .distinct()
+            int orderCount = (int) distinctOrders.stream()
+                    .filter(d -> d.getAmountPaid() != null && d.getAmountPaid().compareTo(BigDecimal.ZERO) > 0)
                     .count();
 
             // Calculate total revenue for this hour
@@ -547,13 +587,13 @@ public class DashboardService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // Calculate total discounts for this hour
-            BigDecimal totalDiscounts = hourData.stream()
+            BigDecimal totalDiscounts = distinctOrders.stream()
                     .filter(d -> d.getDiscountAmount() != null)
                     .map(DetailedReportDataDto::getDiscountAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // Calculate total guests for this hour
-            int totalGuests = hourData.stream()
+            int totalGuests = distinctOrders.stream()
                     .filter(d -> d.getGuestNumber() != null)
                     .mapToInt(DetailedReportDataDto::getGuestNumber)
                     .sum();

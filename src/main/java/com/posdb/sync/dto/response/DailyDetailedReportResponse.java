@@ -19,9 +19,10 @@ public class DailyDetailedReportResponse {
 
     // Void order metrics
     private Integer voidOrderCount;
-    private BigDecimal totalVoidAmount;
+    private Double totalVoidAmount;
+    private List<OrderDetailDto> voidOrderList;
 
     // Inhouse order metrics
-    private Integer inhouseOrderCount;
-    private BigDecimal totalInhouseAmount;
+    private Integer onlineOrderCount;
+    private Double totalOnlineOrderAmount;
 }

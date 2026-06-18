@@ -5,7 +5,8 @@ public enum OrderTypeEnum {
     DINING(1, "Dining"),
     TAKEAWAY(2, "Takeaway"),
     DRIVETHROUGH(3, "Drive Through"),
-    DELIVERY(4, "Delivery");
+    DELIVERY(4, "Delivery"),
+    ONLINE_ORDER(77, "Online Order");
 
     private final int intKey;
     private final String orderType;

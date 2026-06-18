@@ -13,6 +13,7 @@ import java.util.List;
 @ToString
 public class MonthlyReportResponse {
     private String monthName;
+    private Integer totalOrders;
     private BigDecimal totalMonthlyRevenue;
     private LocalDate monthStartDate;
     private LocalDate monthEndDate;
