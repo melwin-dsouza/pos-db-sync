@@ -13,9 +13,8 @@ import java.math.BigDecimal;
 public class DailyRevenueBreakdownDto {
     private Long totalOrders;
     private Long totalGuests;
-    private BigDecimal totalRevenue;
+    private BigDecimal amoountDue;
+    private BigDecimal subTotal;
     private BigDecimal totalDiscounts;
     private OrderTypeEnum orderType;
-    private Long ordertypeOrderCount;
-    private BigDecimal ordertypeRevenue;
 }

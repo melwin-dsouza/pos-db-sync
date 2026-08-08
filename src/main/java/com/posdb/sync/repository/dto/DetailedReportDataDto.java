@@ -17,8 +17,12 @@ public class DetailedReportDataDto {
     private OrderTypeEnum orderType;
     private Integer guestNumber;
     private Integer orderPaymentId;
+    private Integer onAccountChargeId;
     private String paymentMethod;
     private BigDecimal amountPaid;
+    private BigDecimal amountCharged;
+    private BigDecimal paymentEmployeeComp;//tips or gratuity
+    private BigDecimal accountEmployeeComp;
     private Integer orderTransactionId;
     private Integer menuItemId;
     private BigDecimal quantity;

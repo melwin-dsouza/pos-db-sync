@@ -79,7 +79,7 @@ public class DashboardService {
             if (totalRow != null) {
                 response.setTotalOrders(totalRow.getTotalOrders() != null ? totalRow.getTotalOrders().intValue() : 0);
                 response.setNumberOfGuests(totalRow.getTotalGuests() != null ? totalRow.getTotalGuests().intValue() : 0);
-                response.setTotalRevenue(totalRow.getTotalRevenue() != null ? totalRow.getTotalRevenue().doubleValue() : 0);
+                response.setTotalRevenue(totalRow.getAmoountDue() != null ? totalRow.getAmoountDue().doubleValue() : 0);
                 response.setTotalDiscounts(totalRow.getTotalDiscounts() != null ? totalRow.getTotalDiscounts().doubleValue() : 0);
             }
 
@@ -115,11 +115,11 @@ public class DashboardService {
 
             if(response.getOnlineOrderCount() > 0){
                 log.info("Adding online orders to dashboard totals for restaurantId: {} for date: {} current orders {} with {} online orders", restaurantId, selectedDate,response.getTotalOrders(), response.getOnlineOrderCount());
-                response.setTotalOrders(response.getOnlineOrderCount() + response.getTotalOrders());
+//                response.setTotalOrders(response.getOnlineOrderCount() + response.getTotalOrders());
             }
             if(response.getTotalOnlineOrderAmount() != null && response.getTotalOnlineOrderAmount().compareTo(BigDecimal.ZERO) > 0){
                 log.info("Adding online order revenue to dashboard totals for restaurantId: {} for date: {} current revenue {} with online order revenue {}", restaurantId, selectedDate,response.getTotalRevenue(), response.getTotalOnlineOrderAmount());
-                response.setTotalRevenue(response.getTotalOnlineOrderAmount().doubleValue() + response.getTotalRevenue());
+//                response.setTotalRevenue(response.getTotalOnlineOrderAmount().doubleValue() + response.getTotalRevenue());
             }
             response.setAverageOrderValue(response.getTotalOrders() == 0 ? 0 : response.getTotalRevenue() / response.getTotalOrders());
 
@@ -128,7 +128,7 @@ public class DashboardService {
                         new OrderTypeInfo(OrderTypeEnum.ONLINE_ORDER, response.getOnlineOrderCount(), response.getTotalOnlineOrderAmount() != null ? response.getTotalOnlineOrderAmount().doubleValue() : 0));
             }
 
-            setRestaurantListInfo(user, response);
+//            setRestaurantListInfo(user, response); // not needed, extra db call
             log.info("Daily orders report generated successfully for restaurantId: {} for date: {} with {} orders .",
                     restaurantId, response.getStartDateTime(), response.getTotalOrders());
 
@@ -150,8 +150,8 @@ public class DashboardService {
         for (DailyRevenueBreakdownDto dto : typeData) {
             orderTypeInfoList.add(new OrderTypeInfo(
                     dto.getOrderType(),
-                    dto.getOrdertypeOrderCount() != null ? dto.getOrdertypeOrderCount().intValue() : 0,
-                    dto.getOrdertypeRevenue() != null ? dto.getOrdertypeRevenue().doubleValue() : 0
+                    dto.getTotalOrders() != null ? dto.getTotalOrders().intValue() : 0,
+                    dto.getAmoountDue() != null ? dto.getAmoountDue().doubleValue() : 0
             ));
         }
         return orderTypeInfoList;
@@ -189,14 +189,14 @@ public class DashboardService {
             Map<Integer, List<DetailedReportDataDto>> orderMap = queryData.stream()
                     .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
 
-            List<OrderDetailDto> orderDetails = extractOrderDetails(orderMap);
+            List<OrderDetailDto> orderDetails = extractOrderDetails(orderMap, "normal");
             orderDetails.sort(Comparator.comparing(OrderDetailDto::getOrderTime));
             response.setOrderList(orderDetails);
             response.setTotalRevenue(orderDetails.stream()
                     .filter(o -> o.getTotalAmount() != null)
                     .mapToDouble(OrderDetailDto::getTotalAmount)
                     .sum());
-            response.setTotalOrders(orderDetails.size());
+            response.setTotalOrders(orderMap.size());
 
             // Calculate hourly breakdown
             List<HourlyReportDataDto> hourlyBreakdown = calculateHourlyBreakdown(queryData);
@@ -207,7 +207,7 @@ public class DashboardService {
             // Group data by orderId to build order details
             Map<Integer, List<DetailedReportDataDto>> voidOrderMap = voidMetrics.stream()
                     .collect(Collectors.groupingBy(DetailedReportDataDto::getOrderId));
-            List<OrderDetailDto> voidOrderDetails = extractOrderDetails(voidOrderMap);
+            List<OrderDetailDto> voidOrderDetails = extractOrderDetails(voidOrderMap, "void");
             voidOrderDetails.sort(Comparator.comparing(OrderDetailDto::getOrderTime));
             response.setVoidOrderList(voidOrderDetails);
             response.setVoidOrderCount(voidOrderDetails.size());
@@ -238,7 +238,7 @@ public class DashboardService {
         }
     }
 
-    private List<OrderDetailDto> extractOrderDetails(Map<Integer, List<DetailedReportDataDto>> orderMap) {
+    private List<OrderDetailDto> extractOrderDetails(Map<Integer, List<DetailedReportDataDto>> orderMap, String type) {
         List<OrderDetailDto> orderDetails = new ArrayList<>();
         for(Map.Entry<Integer, List<DetailedReportDataDto>> entry : orderMap.entrySet()) {
             log.info("Order ID: {}, number of items: {}", entry.getKey(), entry.getValue().size());
@@ -248,12 +248,52 @@ public class DashboardService {
                 Map<Integer, DetailedReportDataDto> distinctPayments = entry.getValue().stream().filter(d -> d.getOrderPaymentId() != null)
                         .collect(Collectors.toMap(DetailedReportDataDto::getOrderPaymentId, d -> d,
                                 (existing, replacement) -> existing));
+                Map<Integer, DetailedReportDataDto> distinctAccounts = entry.getValue().stream()
+                        .filter(d -> d.getOnAccountChargeId() != null)
+                        .collect(Collectors.toMap(
+                                DetailedReportDataDto::getOnAccountChargeId,
+                                d -> d,
+                                (existing, replacement) -> existing
+                        ));
                 log.info("distinctPayments for Order ID {}: {}", entry.getKey(), distinctPayments.size());
                 orderDetail.setOrderTime(entry.getValue().get(0).getOrderDateTime());
-                orderDetail.setTotalAmount(distinctPayments.values().stream()
-                        .filter(d -> d.getAmountPaid() != null)
-                        .mapToDouble(d -> d.getAmountPaid().doubleValue())
-                        .sum());
+//                orderDetail.setTotalAmount(distinctPayments.values().stream()
+//                        .filter(d -> d.getAmountPaid() != null)
+//                        .mapToDouble(d -> d.getAmountPaid().doubleValue() - (d.getEmployeeComp() != null ? d.getEmployeeComp().doubleValue() :0.0))
+//                        .sum());
+//                orderDetail.setTotalAmount(distinctPayments.values().stream()
+//                        .filter(d -> d.getAmountPaid() != null)
+//                        .mapToDouble(d -> {
+//                            BigDecimal base = d.getAmountPaid();
+//                            BigDecimal employeeComp = d.getEmployeeComp() != null ? d.getEmployeeComp() : BigDecimal.ZERO;
+//                            BigDecimal amountCharged = d.getAmountCharged() != null ? d.getAmountCharged() : BigDecimal.ZERO;
+//                            return base.subtract(employeeComp).add(amountCharged).doubleValue();
+//                        })
+//                        .sum());
+
+                // 1. Calculate sum from distinct payments: (amountPaid - employeeComp)
+                BigDecimal paymentsSum = distinctPayments.values().stream()
+                        .map(d -> {
+                            BigDecimal base = d.getAmountPaid() != null ? d.getAmountPaid() : BigDecimal.ZERO;
+                            BigDecimal employeeComp = d.getPaymentEmployeeComp() != null ? d.getPaymentEmployeeComp() : BigDecimal.ZERO;
+                            return base.subtract(employeeComp);
+                        })
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // 2. Calculate sum from distinct accounts: (amountCharged)
+                BigDecimal accountsSum = distinctAccounts.values().stream()
+                        .map(d -> {
+                            BigDecimal base = d.getAmountCharged() != null ? d.getAmountCharged() : BigDecimal.ZERO;
+                            BigDecimal employeeComp = d.getAccountEmployeeComp() != null ? d.getAccountEmployeeComp() : BigDecimal.ZERO;
+                            return base.subtract(employeeComp);
+                        })
+//                        .map(d -> d.getAmountCharged() != null ? d.getAmountCharged() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // 3. Set total order amount (Converting to double at the very end if required by setTotalAmount)
+                orderDetail.setTotalAmount(paymentsSum.add(accountsSum).doubleValue());
+
+
                 orderDetail.setPaymentMode(distinctPayments.values().stream()
                         .filter(d -> d.getPaymentMethod() != null)
                         .map(DetailedReportDataDto::getPaymentMethod)
@@ -384,18 +424,18 @@ public class DashboardService {
             }
 
 
-            if(response.getInhouseOrderCount() > 0){
-                response.setTotalOrders(response.getInhouseOrderCount() + response.getByOrderTypeList().stream()
-                        .map(OrderTypeDto::getNumberOfOrders)
-                        .reduce(0, Integer::sum));
-            }else{
+//            if(response.getInhouseOrderCount() > 0){
+//                response.setTotalOrders(response.getInhouseOrderCount() + response.getByOrderTypeList().stream()
+//                        .map(OrderTypeDto::getNumberOfOrders)
+//                        .reduce(0, Integer::sum));
+//            }else{
                 response.setTotalOrders(response.getByOrderTypeList().stream()
                         .map(OrderTypeDto::getNumberOfOrders)
                         .reduce(0, Integer::sum));
-            }
-            if(response.getTotalInhouseAmount() != null && response.getTotalInhouseAmount().compareTo(BigDecimal.ZERO) > 0){
-                response.setTotalMonthlyRevenue(response.getTotalInhouseAmount().add(totalRevenue));
-            }
+//            }
+//            if(response.getTotalInhouseAmount() != null && response.getTotalInhouseAmount().compareTo(BigDecimal.ZERO) > 0){
+//                response.setTotalMonthlyRevenue(response.getTotalInhouseAmount().add(totalRevenue));
+//            }
 
             if(response.getInhouseOrderCount() > 0){
                 OrderTypeDto typeDto = new OrderTypeDto();
@@ -577,13 +617,20 @@ public class DashboardService {
 
             // Get distinct orders for this hour
             int orderCount = (int) distinctOrders.stream()
-                    .filter(d -> d.getAmountPaid() != null && d.getAmountPaid().compareTo(BigDecimal.ZERO) > 0)
+                    .filter(d -> (d.getAmountPaid() != null && d.getAmountPaid().compareTo(BigDecimal.ZERO) > 0)
+                            || (d.getAmountCharged() != null && d.getAmountCharged().compareTo(BigDecimal.ZERO) > 0))
                     .count();
 
             // Calculate total revenue for this hour
-            BigDecimal totalRevenue = distinctPayments.stream()
-                    .filter(d -> d.getAmountPaid() != null)
-                    .map(DetailedReportDataDto::getAmountPaid)
+            BigDecimal totalRevenue = distinctOrders.stream()
+                    .filter(d -> d.getAmountPaid() != null || d.getAmountCharged() != null)
+                    .map(d -> {
+                        BigDecimal paid = d.getAmountPaid() != null ? d.getAmountPaid() : BigDecimal.ZERO;
+                        BigDecimal charged = d.getAmountCharged() != null ? d.getAmountCharged() : BigDecimal.ZERO;
+                        BigDecimal paymentEmpComp = d.getPaymentEmployeeComp() != null ? d.getPaymentEmployeeComp() : BigDecimal.ZERO;
+                        BigDecimal accountEmpComp = d.getAccountEmployeeComp() != null ? d.getAccountEmployeeComp() : BigDecimal.ZERO;
+                        return paid.add(charged).subtract(paymentEmpComp).subtract(accountEmpComp);
+                    })
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // Calculate total discounts for this hour

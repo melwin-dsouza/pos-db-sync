@@ -26,11 +26,19 @@ public class OrderHeaderData {
 
     private Integer dineInTableId;
 
+    private Integer customerId;
+
+    private BigDecimal deliveryCharge;
+
     private Integer driverEmployeeId;
 
     private Integer discountId;
 
     private BigDecimal discountAmount;
+
+    private String discountBasis;
+
+    private String orderStatus;
 
     private BigDecimal amountDue;
 
@@ -39,6 +47,14 @@ public class OrderHeaderData {
     private Integer cashDiscountApprovalEmpId;
 
     private BigDecimal subTotal;
+
+    private BigDecimal cashGratuity;
+
+    private BigDecimal discountAmountUsed;
+
+    private BigDecimal gstRate;
+
+    private BigDecimal gstAmountUsed;
 
     private Integer guestNumber;
 

@@ -1,5 +1,6 @@
 package com.posdb.sync.entity;
 
+import com.posdb.sync.entity.enums.OrderStatusEnum;
 import com.posdb.sync.entity.enums.OrderTypeEnum;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
@@ -63,7 +64,17 @@ public class OrderHeader extends PanacheEntityBase {
     private Integer discountId;
 
     @Column(name = "discount_amount")
-    private BigDecimal discountAmount;
+    private BigDecimal discountAmount; //discount percentage
+
+    @Column(name = "discount_basis")
+    private String discountBasis; //if discountBasis is 1 then discountAmount is percentage, if discountBasis is 0 then discountAmount is flat/actual amount
+
+    @Column(name = "order_status_id")
+    private String orderStatusId;
+
+    @Column(name = "order_status")
+    @Enumerated(EnumType.STRING)
+    private OrderStatusEnum orderStatus;
 
     @Column(name = "amount_due")
     private BigDecimal amountDue;
@@ -99,6 +110,12 @@ public class OrderHeader extends PanacheEntityBase {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    @Column(name = "discount_amount_used")
+    private BigDecimal discountAmountUsed; //actual amount
+
+    @Column(name = "cash_gratuity")
+    private BigDecimal cashGratuity; //tips incase of Dining , platform fee incase of Online order
 
 }
 

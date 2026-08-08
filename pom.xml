@@ -70,6 +70,11 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-panache</artifactId>
         </dependency>
+        <!-- for scheduled jobs -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
         <!-- for access control (provides annotations like @RolesAllowed) -->
         <dependency>
             <groupId>io.quarkus</groupId>
