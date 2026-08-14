@@ -4,7 +4,7 @@ package com.posdb.sync.entity.enums;
 public enum OrderTypeEnum {
     DINING(1, "Dining"),
     TAKEAWAY(2, "Takeaway"),
-    DRIVETHROUGH(3, "Drive Through"),
+    CATERING(3, "Catering"),
     DELIVERY(4, "Delivery"),
     ONLINE_ORDER(77, "Online Order");
 
