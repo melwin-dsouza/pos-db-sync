@@ -2,11 +2,10 @@ package com.posdb.sync.service;
 
 import com.posdb.sync.dto.response.SyncResponse;
 import com.posdb.sync.dto.sync.*;
-import com.posdb.sync.entity.CustomerFile;
-import com.posdb.sync.entity.OnAccountCharge;
-import com.posdb.sync.entity.OrderVoidLog;
-import com.posdb.sync.entity.Restaurant;
+import com.posdb.sync.entity.*;
 import com.posdb.sync.exception.AppException;
+import com.posdb.sync.repository.OnAccountChargeRepository;
+import com.posdb.sync.repository.OrderVoidLogRepository;
 import com.posdb.sync.utils.TextUtil;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -28,6 +27,12 @@ public class OrderMiscSyncService {
 
     @Inject
     ApiKeyValidatorService apiKeyValidatorService;
+
+    @Inject
+    OrderVoidLogRepository orderVoidLogRepository;
+
+    @Inject
+    OnAccountChargeRepository onAccountChargeRepository;
 
     @Transactional
     public SyncResponse syncOrderVoidLogs(OrderVoidLogSyncRequest request, @Context HttpHeaders headers) {
@@ -84,12 +89,21 @@ public class OrderMiscSyncService {
     private Result processOrderVoidLogData(OrderVoidLogData data, Restaurant restaurant, StringBuilder failureMessage, Result result) {
         try {
             int recordIndex = result.recordIndex() + 1;
-            OrderVoidLog voidLog = new OrderVoidLog();
-            voidLog.setRestaurant(restaurant);
             if (TextUtil.isEmpty(String.valueOf(data.getOrderId()))) {
                 log.warn("OrderMiscSyncService:: Missing orderId in order void log data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
                 throw new AppException("orderId is required for order void log. Index: " + recordIndex, Response.Status.BAD_REQUEST);
             }
+
+            OrderVoidLog voidLog = orderVoidLogRepository.findByRestaurantAndAutoId(restaurant, data.getAutoId())
+                    .orElseGet(() -> {
+                        OrderVoidLog newVoid = new OrderVoidLog();
+                        newVoid.setRestaurant(restaurant);
+                        newVoid.setAutoId(data.getAutoId());
+                        return newVoid;
+                    });
+
+            boolean isNewRecord = voidLog.getId() == null;
+
             voidLog.setOrderId(data.getOrderId());
             voidLog.setOrderTransactionId(data.getOrderTransactionId());
             voidLog.setEmployeeId(data.getEmployeeId());
@@ -98,8 +112,12 @@ public class OrderMiscSyncService {
             voidLog.setVoidForItemReduction(data.getVoidForItemReduction());
             voidLog.setVoidAmount(data.getVoidAmount());
             voidLog.setAutoId(data.getAutoId());
-            voidLog.persist();
-            log.debug("OrderMiscSyncService:: Order void log synced: orderId={}, restaurantId={}", data.getOrderId(), restaurant.getName());
+            if (isNewRecord) {
+                voidLog.persist();
+                log.debug("OrderMiscSyncService:: Order Void log inserted: autoId={}, restaurantId={}", data.getAutoId(), restaurant.getName());
+            } else {
+                log.debug("OrderSyncService:: Order Void log updated: autoId={}, restaurantId={}", data.getAutoId(), restaurant.getName());
+            }
             return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
             int recordIndex = result.recordIndex() + 1;
@@ -164,12 +182,20 @@ public class OrderMiscSyncService {
     private Result processOnAccountChargeData(OnAccountChargeData data, Restaurant restaurant, StringBuilder failureMessage, Result result) {
         try {
             int recordIndex = result.recordIndex() + 1;
-            OnAccountCharge charge = new OnAccountCharge();
-            charge.setRestaurant(restaurant);
             if (TextUtil.isEmpty(String.valueOf(data.getOrderId()))) {
                 log.warn("OrderMiscSyncService:: Missing orderId in on account charge data for restaurantId: {}, Index: {}", restaurant.getName(), recordIndex);
                 throw new AppException("orderId is required for on account charge. Index: " + recordIndex, Response.Status.BAD_REQUEST);
             }
+
+            OnAccountCharge charge = onAccountChargeRepository.findByRestaurantAndChargeId(restaurant, data.getOrderChargeId())
+                    .orElseGet(() -> {
+                        OnAccountCharge newCharge = new OnAccountCharge();
+                        newCharge.setRestaurant(restaurant);
+                        newCharge.setOrderChargeId(data.getOrderChargeId());
+                        return newCharge;
+                    });
+
+            boolean isNewRecord = charge.getId() == null;
             charge.setOrderChargeId(data.getOrderChargeId());
             charge.setChargeDateTime(data.getChargeDateTime());
             charge.setCashierId(data.getCashierId());
@@ -180,8 +206,14 @@ public class OrderMiscSyncService {
             charge.setOrderChargePaymentId(data.getOrderChargePaymentId());
             charge.setEmployeeComp(data.getEmployeeComp());
             charge.setChargeDueDate(data.getChargeDueDate());
-            charge.persist();
-            log.debug("OrderMiscSyncService:: On account charge synced: orderChargeId={}, restaurantId={}", data.getOrderChargeId(), restaurant.getName());
+
+            if (isNewRecord) {
+                charge.persist();
+                log.debug("OrderMiscSyncService:: On account charge inserted: orderId={}, restaurantId={}", data.getOrderId(), restaurant.getName());
+            } else {
+                log.debug("OrderMiscSyncService:: On account charge updated: orderId={}, restaurantId={}", data.getOrderId(), restaurant.getName());
+            }
+
             return new Result(result.successCount() + 1, result.failCount(), recordIndex);
         } catch (Exception e) {
             int recordIndex = result.recordIndex() + 1;
